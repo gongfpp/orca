@@ -124,27 +124,33 @@ export function isLocalBrowserPageOwner(
 export function profileListByHostUpdate(
   state: Pick<
     AppState,
-    | 'browserSessionHostIdOverride'
-    | 'browserSessionProfilesByHostId'
-    | 'defaultBrowserSessionProfileId'
-    | 'defaultBrowserSessionProfileIdByHostId'
-    | 'settings'
+    'browserSessionHostIdOverride' | 'browserSessionProfilesByHostId' | 'settings'
   >,
   profiles: BrowserSessionProfile[],
   hostId: ExecutionHostId = getBrowserSettingsHostId(state)
 ): Partial<BrowserSlice> {
-  const isSettingsHost = getBrowserSettingsHostId(state) === hostId
-  // Why: a default the host no longer lists would send every new tab to a deleted profile. A real
-  // listing always holds Default; the empty list a failed fetch writes proves nothing was deleted.
-  const isUnlisted = (profileId: string | null | undefined): boolean =>
-    !!profileId && profiles.length > 0 && !profiles.some((profile) => profile.id === profileId)
   return {
-    ...(isSettingsHost ? { browserSessionProfiles: profiles } : {}),
+    ...(getBrowserSettingsHostId(state) === hostId ? { browserSessionProfiles: profiles } : {}),
     browserSessionProfilesByHostId: {
       ...state.browserSessionProfilesByHostId,
       [hostId]: profiles
-    },
-    ...(isSettingsHost && isUnlisted(state.defaultBrowserSessionProfileId)
+    }
+  }
+}
+
+/** A host's full listing; it also drops a default pick the host no longer lists, so new tabs don't open on a deleted profile. */
+export function listedProfilesByHostUpdate(
+  state: AppState,
+  profiles: BrowserSessionProfile[],
+  hostId: ExecutionHostId
+): Partial<BrowserSlice> {
+  const isUnlisted = (profileId: string | null | undefined): boolean =>
+    !!profileId && !profiles.some((profile) => profile.id === profileId)
+  const update = profileListByHostUpdate(state, profiles, hostId)
+  return {
+    ...update,
+    // Why: the unkeyed default belongs to the Settings host, the one whose list the mirror follows.
+    ...(update.browserSessionProfiles && isUnlisted(state.defaultBrowserSessionProfileId)
       ? { defaultBrowserSessionProfileId: null }
       : {}),
     ...(isUnlisted(state.defaultBrowserSessionProfileIdByHostId[hostId])

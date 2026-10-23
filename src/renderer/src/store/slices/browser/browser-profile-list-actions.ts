@@ -11,7 +11,9 @@ import {
   getBrowserProfilesForHost,
   getBrowserSettingsHostId,
   getBrowserSettingsRuntimeEnvironmentId,
-  profileListByHostUpdate
+  profileListByHostUpdate,
+  getDefaultBrowserProfileForHost,
+  listedProfilesByHostUpdate
 } from './browser-host-state'
 
 export function createBrowserProfileListActions(
@@ -46,7 +48,7 @@ export function createBrowserProfileListActions(
               ? { ...profile, source: clientImportSources[profile.id] }
               : profile
           )
-          set((s) => profileListByHostUpdate(s, profiles, hostId))
+          set((s) => listedProfilesByHostUpdate(s, profiles, hostId))
         } catch {
           set((s) => profileListByHostUpdate(s, [], hostId))
         }
@@ -54,7 +56,7 @@ export function createBrowserProfileListActions(
       }
       try {
         const profiles = (await window.api.browser.sessionListProfiles()) as BrowserSessionProfile[]
-        set((s) => profileListByHostUpdate(s, profiles, hostId))
+        set((s) => listedProfilesByHostUpdate(s, profiles, hostId))
       } catch {
         /* best-effort — stale profile list is preferable to a crash */
       }
@@ -118,13 +120,24 @@ export function createBrowserProfileListActions(
             { timeoutMs: 15_000 }
           )
           if (result.deleted) {
-            set((s) =>
-              profileListByHostUpdate(
+            set((s) => ({
+              ...profileListByHostUpdate(
                 s,
                 getBrowserProfilesForHost(s, hostId).filter((profile) => profile.id !== profileId),
                 hostId
-              )
-            )
+              ),
+              ...(getDefaultBrowserProfileForHost(s, hostId) === profileId
+                ? {
+                    ...(getBrowserSettingsHostId(s) === hostId
+                      ? { defaultBrowserSessionProfileId: null }
+                      : {}),
+                    defaultBrowserSessionProfileIdByHostId: {
+                      ...s.defaultBrowserSessionProfileIdByHostId,
+                      [hostId]: null
+                    }
+                  }
+                : {})
+            }))
           }
           return result.deleted
         } catch {
@@ -134,13 +147,24 @@ export function createBrowserProfileListActions(
       try {
         const ok = await window.api.browser.sessionDeleteProfile({ profileId })
         if (ok) {
-          set((s) =>
-            profileListByHostUpdate(
+          set((s) => ({
+            ...profileListByHostUpdate(
               s,
               getBrowserProfilesForHost(s, hostId).filter((profile) => profile.id !== profileId),
               hostId
-            )
-          )
+            ),
+            ...(getDefaultBrowserProfileForHost(s, hostId) === profileId
+              ? {
+                  ...(getBrowserSettingsHostId(s) === hostId
+                    ? { defaultBrowserSessionProfileId: null }
+                    : {}),
+                  defaultBrowserSessionProfileIdByHostId: {
+                    ...s.defaultBrowserSessionProfileIdByHostId,
+                    [hostId]: null
+                  }
+                }
+              : {})
+          }))
         }
         return ok
       } catch {
