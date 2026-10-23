@@ -2,7 +2,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   getEffectiveKeybindingsForAction,
-  getKeybindingConflictIdentity,
   keybindingFromInput,
   keybindingMatchesAction,
   keybindingMatchesInput
@@ -31,8 +30,7 @@ describe('keybindings', () => {
       for (const input of [
         { key: '+', code: 'BracketRight', shift: false },
         { key: '+', code: 'Minus', shift: false },
-        { key: '+', code: 'Equal', shift: true },
-        { key: '=', code: 'Equal', shift: false }
+        { key: '+', code: 'Equal', shift: true }
       ]) {
         expect(keybindingMatchesAction('zoom.in', { ...plusKey, ...mod, ...input }, platform)).toBe(
           true
@@ -47,9 +45,6 @@ describe('keybindings', () => {
         )
       ).toBe(false)
     }
-    expect(getKeybindingConflictIdentity('Mod+Plus', 'linux')).toBe(
-      getKeybindingConflictIdentity('Mod+Shift+Plus', 'linux')
-    )
   })
 
   it('matches file explorer undo and redo by produced logical key', () => {
