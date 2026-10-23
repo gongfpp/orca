@@ -389,6 +389,28 @@ describe('createBrowserSlice runtime guard', () => {
     expect(store.getState().defaultBrowserSessionProfileIdByHostId.local).toBeNull()
   })
 
+  it('keeps the newest listing when an older one answers last', async () => {
+    const store = createTestStore()
+    const listed = (id: string) => ({
+      id,
+      scope: id === 'default' ? ('default' as const) : ('isolated' as const),
+      partition: `persist:${id}`,
+      label: id,
+      source: null
+    })
+    const older = Promise.withResolvers<ReturnType<typeof listed>[]>()
+    mockApi.browser.sessionListProfiles
+      .mockReturnValueOnce(older.promise)
+      .mockResolvedValueOnce([listed('default')])
+
+    const olderFetch = store.getState().fetchBrowserSessionProfiles('local')
+    await store.getState().fetchBrowserSessionProfiles('local')
+    older.resolve([listed('default'), listed('deleted')])
+    await olderFetch
+
+    expect(store.getState().browserSessionProfilesByHostId.local).toEqual([listed('default')])
+  })
+
   it('creates a profile through local browser IPC', async () => {
     const store = createTestStore()
     const profile = {
