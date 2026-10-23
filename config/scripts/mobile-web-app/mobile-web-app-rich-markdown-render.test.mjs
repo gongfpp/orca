@@ -695,7 +695,8 @@ describeEditor(
             // React's passive-effect cleanup can run after the surface leaves the DOM.
             await expect
               .poll(
-                async () => Object.keys(await listeners()).filter((key) => key.startsWith('element ')),
+                async () =>
+                  Object.keys(await listeners()).filter((key) => key.startsWith('element ')),
                 { timeout: 15_000 }
               )
               .toEqual([])
