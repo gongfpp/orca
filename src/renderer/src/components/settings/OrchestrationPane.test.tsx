@@ -248,14 +248,21 @@ describe('OrchestrationPane', () => {
     expect(input.value).toBe('1')
   })
 
-  it('keeps host-only nested depth out of paired web clients', () => {
+  it('keeps host-only runtime settings out of paired web clients', () => {
     ;(globalThis as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__ = true
     const markup = renderToStaticMarkup(<OrchestrationPane {...getPaneProps()} />)
 
     expect(markup).not.toContain('Nested worker depth')
+    expect(markup).not.toContain('Tell the coordinator about chat errors')
     expect(
       matchesSettingsSearch(
         'nested worker',
+        getOrchestrationPaneSearchEntries({ includeLocalRuntimeSettings: false })
+      )
+    ).toBe(false)
+    expect(
+      matchesSettingsSearch(
+        'chat errors',
         getOrchestrationPaneSearchEntries({ includeLocalRuntimeSettings: false })
       )
     ).toBe(false)
