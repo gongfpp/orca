@@ -1,5 +1,6 @@
 import { ORCA_BROWSER_PAGE_GUEST_WEB_PREFERENCES_ATTRIBUTE } from '../../../../shared/browser-guest-web-preferences'
 import { isBlankBrowserUrl } from '@/lib/browser-palette-search'
+import { forwardBrowserPagePinchZoom } from './host-guest/browser-page-pinch-zoom'
 
 export function createBrowserClientPageRetainedRoot(document: Document): HTMLDivElement {
   const root = document.createElement('div')
@@ -78,6 +79,7 @@ export function createBrowserClientPageWebview(options: {
   webview.addEventListener('ipc-message', (event) =>
     guestMessageHandler?.(options.identity.browserPageId, webview, event)
   )
+  forwardBrowserPagePinchZoom(options.identity.browserPageId, webview)
   return webview
 }
 

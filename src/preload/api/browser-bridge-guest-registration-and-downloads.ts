@@ -98,6 +98,8 @@ export const browserGuestRegistrationAndDownloadsApi = {
     colorScheme: BrowserSiteColorScheme | null
   }): Promise<BrowserPageSiteDisplay | null> =>
     ipcRenderer.invoke('browser:setPageSiteColorScheme', args),
+  pinchPage: (args: { browserPageId: string; deltaY: number; x: number; y: number }): void =>
+    ipcRenderer.send('browser:pinchPage', args),
   reportViewportScrollState: (args: {
     browserPageId: string
     state: {

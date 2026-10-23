@@ -9,6 +9,7 @@ import {
 } from '../../shared/browser-client-page-metadata-protocol'
 import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
 import { isTrustedBrowserRenderer } from './browser-renderer-trust'
+import { pinchGuestPage } from '../browser/browser-guest-pinch-zoom'
 import type { BrowserViewportOverride } from '../../shared/browser-workspace-types'
 import {
   isBrowserSiteColorScheme,
@@ -31,12 +32,17 @@ function isPagePoint(value: unknown): value is { x: number; y: number } {
   )
 }
 
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value)
+const clampFraction = (value: number): number => Math.min(1, Math.max(0, value))
+
 export function registerBrowserGuestViewHandlers(): void {
   ipcMain.removeHandler('browser:openDevTools')
   ipcMain.removeHandler('browser:addWordToDictionary')
   ipcMain.removeHandler('browser:copyImageAt')
   ipcMain.removeHandler('browser:setViewportOverride')
   ipcMain.removeAllListeners?.('browser:reportViewportScrollState')
+  ipcMain.removeAllListeners?.('browser:pinchPage')
   ipcMain.removeHandler('browser:setAnnotationViewportBridge')
   ipcMain.removeHandler('browser:acceptDownload')
   ipcMain.removeHandler('browser:cancelDownload')
@@ -46,15 +52,13 @@ export function registerBrowserGuestViewHandlers(): void {
   ipcMain.removeHandler('browser:setPageSiteColorScheme')
 
   // Page/session operations exclude document previews.
-  const pageGuestId = (event: IpcMainInvokeEvent, browserPageId: unknown): number | null =>
+  type PageEvent = Pick<IpcMainInvokeEvent, 'sender'>
+  const pageGuestId = (event: PageEvent, browserPageId: unknown): number | null =>
     isTrustedBrowserRenderer(event.sender) && typeof browserPageId === 'string'
       ? browserManager.getGuestWebContentsId(browserPageId)
       : null
 
-  const pageGuest = (
-    event: IpcMainInvokeEvent,
-    browserPageId: unknown
-  ): Electron.WebContents | null => {
+  const pageGuest = (event: PageEvent, browserPageId: unknown): Electron.WebContents | null => {
     const guestId = pageGuestId(event, browserPageId)
     const guest = guestId === null ? undefined : webContents.fromId(guestId)
     return guest && !guest.isDestroyed() ? guest : null
@@ -166,6 +170,17 @@ export function registerBrowserGuestViewHandlers(): void {
         }
       }
       return browserManager.setViewportOverride(args.browserPageId, args.override)
+    }
+  )
+
+  ipcMain.on?.(
+    'browser:pinchPage',
+    (event, args: { browserPageId?: unknown; deltaY?: unknown; x?: unknown; y?: unknown }) => {
+      const guest = pageGuest(event, args?.browserPageId)
+      const { deltaY, x, y } = args ?? {}
+      if (guest && isFiniteNumber(deltaY) && isFiniteNumber(x) && isFiniteNumber(y)) {
+        pinchGuestPage(guest, { deltaY, x: clampFraction(x), y: clampFraction(y) })
+      }
     }
   )
 

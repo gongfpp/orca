@@ -122,6 +122,8 @@ export type BrowserApi = {
     browserPageId: string
     colorScheme: BrowserSiteColorScheme | null
   }) => Promise<BrowserPageSiteDisplay | null>
+  /** A trackpad pinch over the page; x and y are fractions of the page's width and height. */
+  pinchPage: (args: { browserPageId: string; deltaY: number; x: number; y: number }) => void
   reportViewportScrollState?: (args: {
     browserPageId: string
     state: BrowserViewportScrollState

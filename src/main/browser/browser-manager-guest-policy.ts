@@ -7,6 +7,7 @@ import { BrowserManagerGuestCleanup } from './browser-manager-guest-cleanup'
 import { allowPageUnload } from './browser-guest-unload-policy'
 import { installDocPreviewGuestPolicy } from './doc-preview-guest-policy'
 import { installGuestDevToolsWindowBehavior } from './browser-guest-devtools-window'
+import { enableGuestPinchZoom } from './browser-guest-pinch-zoom'
 
 export abstract class BrowserManagerGuestPolicy extends BrowserManagerGuestCleanup {
   attachGuestPolicies(
@@ -29,6 +30,7 @@ export abstract class BrowserManagerGuestPolicy extends BrowserManagerGuestClean
     const disposeDetachTracking = this.trackDebuggerDetachForCdpOverrides(guest)
     // Keep background compositor frames available for screenshots.
     guest.setBackgroundThrottling(false)
+    enableGuestPinchZoom(guest)
     const disposePopupPolicy = this.installGuestPopupPolicy(guest)
     const disposeNavigationPolicy = this.installGuestNavigationPolicy(guest)
     const disposeDevToolsWindow = installGuestDevToolsWindowBehavior({
