@@ -26,6 +26,7 @@ import {
 } from './browser-webauthn-access'
 import { noticeDocPreviewDownloadBlocked } from './doc-preview-download-block-notice'
 import { isRemoteCliDrivenGuest } from './desktop-browser-bridge/remote-cli-driven-workspaces'
+import { isBrowserRoutePartition } from './browser-route-identity'
 
 const configuredPartitions = new Set<string>()
 const userAgentPolicyDisposerBySession = new WeakMap<Session, () => void>()
@@ -89,6 +90,34 @@ const handleDeniedWillDownload = (
   noticeDocPreviewDownloadBlocked(webContents)
 }
 
+type RestrictedFileSystemAccessListener = (
+  event: Electron.Event,
+  details: Electron.FileSystemAccessRestrictedDetails,
+  callback: (action: 'allow' | 'deny' | 'tryAgain') => void
+) => void
+
+// Chromium waits for an answer on blocklisted system folders; without one the page hangs.
+const denyRestrictedFileSystemAccess: RestrictedFileSystemAccessListener = (
+  _event,
+  _details,
+  callback
+) => callback('deny')
+
+const handleRestrictedFileSystemAccess: RestrictedFileSystemAccessListener = (
+  _event,
+  details,
+  callback
+) => {
+  callback('deny')
+  if (details.webContents) {
+    browserManager.notifyPermissionDenied({
+      guestWebContentsId: details.webContents.id,
+      permission: 'fileSystem',
+      rawUrl: details.origin
+    })
+  }
+}
+
 function resolvePermissionNoticeUrl(
   webContents: Electron.WebContents,
   details: Electron.PermissionRequest | undefined
@@ -139,6 +168,11 @@ export async function installBrowserSessionPartitionPolicies(
     sess.setPermissionCheckHandler(() => false)
     clearBrowserWebAuthnAccessHandlers(sess)
   } else {
+    // Another machine can script routed pages and could reuse their stored file handles.
+    const deniesFileSystem = isBrowserRoutePartition(partition)
+    const isAutoGranted = (permission: string): boolean =>
+      isAutoGrantedBrowserSessionPermission(permission) &&
+      !(deniesFileSystem && permission === 'fileSystem')
     const siteMemory =
       options.sitePermissions === 'session'
         ? sessionBrowserSitePermissions(partition)
@@ -172,7 +206,7 @@ export async function installBrowserSessionPartitionPolicies(
       const mediaRequest = 'mediaTypes' in details ? details : undefined
       const sitePermissions = browserSitePermissionsFor(permission, mediaRequest?.mediaTypes)
       if (!sitePermissions) {
-        const allowed = isAutoGrantedBrowserSessionPermission(permission)
+        const allowed = isAutoGranted(permission)
         if (!allowed) {
           notifyDenied()
         }
@@ -227,7 +261,7 @@ export async function installBrowserSessionPartitionPolicies(
           (permission !== 'media' || hasSystemMediaAccess(details?.mediaType))
         )
       }
-      return isAutoGrantedBrowserSessionPermission(permission)
+      return isAutoGranted(permission)
     })
     installBrowserWebAuthnAccessHandlers(sess)
   }
@@ -239,6 +273,14 @@ export async function installBrowserSessionPartitionPolicies(
   sess.on(
     'will-download',
     options?.downloads === 'deny' ? handleDeniedWillDownload : handleWillDownload
+  )
+  sess.removeListener('file-system-access-restricted', denyRestrictedFileSystemAccess)
+  sess.removeListener('file-system-access-restricted', handleRestrictedFileSystemAccess)
+  sess.on(
+    'file-system-access-restricted',
+    options?.permissions === 'deny'
+      ? denyRestrictedFileSystemAccess
+      : handleRestrictedFileSystemAccess
   )
   configuredPartitions.add(partition)
   return proxyReady
@@ -252,6 +294,8 @@ export function clearBrowserSessionPartitionPolicies(partition: string, sess: Se
   browserManager.removeCertificateRequestGuard(sess)
   sess.removeListener('will-download', handleWillDownload)
   sess.removeListener('will-download', handleDeniedWillDownload)
+  sess.removeListener('file-system-access-restricted', denyRestrictedFileSystemAccess)
+  sess.removeListener('file-system-access-restricted', handleRestrictedFileSystemAccess)
   clearBrowserWebAuthnAccessHandlers(sess)
   sess.setPermissionRequestHandler(null)
   sess.setPermissionCheckHandler(null)
