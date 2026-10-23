@@ -439,11 +439,13 @@ describe('workspace activation and metadata reentry', () => {
   it.each([
     { label: 'absent notifier', notifier: null },
     { label: 'missing optional notifier method', notifier: {} }
-  ])('skips the sleeping workspace ID read for $label', async ({ notifier }) => {
+  ])("still queues main's wake with $label", async ({ notifier }) => {
     const reads = configureMobileActivation()
     Object.defineProperty(runtime, 'notifier', { value: notifier })
-    await runtime.activateManagedWorktree('selected', { clientKind: 'mobile' })
-    expect(reads()).toBe(4)
+    await expect(
+      runtime.activateManagedWorktree('selected', { clientKind: 'mobile' })
+    ).resolves.toMatchObject({ sleepingAgentWake: 'requested' })
+    expect(reads()).toBe(5)
   })
 
   it('looks up the sleeping callback late and keeps its notifier receiver', async () => {
@@ -464,7 +466,10 @@ describe('workspace activation and metadata reentry', () => {
     })
     await runtime.activateManagedWorktree('selected', { clientKind: 'mobile' })
     expect(reads()).toBe(5)
-    expect(calls).toEqual([{ receiver: notifier, args: [runtime.selectedWorktree.id] }])
+    // The window's callback runs once main's queued resume has.
+    await vi.waitFor(() =>
+      expect(calls).toEqual([{ receiver: notifier, args: [runtime.selectedWorktree.id] }])
+    )
   })
 })
 

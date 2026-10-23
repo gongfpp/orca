@@ -3,7 +3,7 @@ import WebSocket from 'ws'
 import { abortSignalReason } from './abort-signal-reason'
 import { RemoteRuntimeClientError } from './remote-runtime-client-error'
 import { REMOTE_RUNTIME_MAX_READY_WAITERS } from './remote-runtime-memory-limits'
-import { remoteRuntimeUnavailableError } from './remote-runtime-request-frames'
+import { remoteRuntimeUnavailableError } from './remote-runtime/requests/remote-runtime-request-frames'
 import type {
   SharedControlConnectionState,
   SharedControlReadyWaiter

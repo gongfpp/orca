@@ -3,11 +3,11 @@ import {
   remoteRuntimeAuthReplyError,
   remoteRuntimeReadyError,
   remoteRuntimeUnavailableError
-} from './remote-runtime-request-frames'
+} from './remote-runtime/requests/remote-runtime-request-frames'
 import type { RemoteRuntimeClientError } from './remote-runtime-client-error'
 import { dispatchSharedControlFrame } from './remote-runtime-shared-control-frame-dispatch'
 import { parseSharedControlFrame } from './remote-runtime-shared-control-protocol'
-import type { SharedControlRetiredRequestIds } from './remote-runtime-shared-control-retired-request-ids'
+import type { SharedControlRetiredRequestIds } from './remote-runtime/requests/remote-runtime-shared-control-retired-request-ids'
 import { resolveSharedControlReadyWaiters } from './remote-runtime-shared-control-state'
 import type {
   SharedControlConnectionState,

@@ -60,9 +60,10 @@ export type StructuredSessionTurnSend = {
 
 /**
  * What the typed text is, which decides how it is typed. A dispatch preamble leads with the
- * coordinator's task line; no other kind of message may borrow that.
+ * coordinator's task line; no other kind of message may borrow that. An external message is a
+ * connector thread's follow-up, typed as the user's own.
  */
-export type TerminalTurnPurpose = 'dispatch-preamble'
+export type TerminalTurnPurpose = 'dispatch-preamble' | 'external-message'
 
 /** A terminal has one write: whether a mid-turn prompt waits is the agent TUI's own behaviour. */
 export type TerminalTurn = {
@@ -132,6 +133,14 @@ function terminalTurnOptions(turn: TerminalTurn): DispatchPreambleSendOptions {
   switch (turn.purpose) {
     case 'dispatch-preamble':
       return dispatchPreambleSendOptions(turn.operationId)
+    case 'external-message':
+      // The writer returning is the whole receipt; the turn is read from hooks, not awaited here.
+      return {
+        inputKind: 'driving',
+        acceptQueued: true,
+        observationTimeoutMs: 0,
+        requestId: turn.operationId
+      }
   }
 }
 

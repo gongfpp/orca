@@ -4,7 +4,7 @@ import type {
   JiraIssueType,
   JiraPriority,
   JiraUser
-} from '../../shared/jira-types'
+} from '../../shared/jira/jira-types'
 import { acquire, release } from './request-queue'
 import { apiBasePath, jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
@@ -175,7 +175,7 @@ export async function searchUsers(query?: string, siteId?: string | null): Promi
       clearToken(entry.site.id)
       throw error
     }
-    // Browse-users permission is optional; the dialog falls back to a text field.
+    // Browse-users permission is optional; the dialog allows explicit known user IDs.
     console.warn('[jira] searchUsers failed:', error)
     return []
   } finally {

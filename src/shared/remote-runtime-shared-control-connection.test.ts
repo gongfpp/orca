@@ -8,7 +8,7 @@ import {
   retainedRemoteRuntimeJsonStringBytes,
   serializeRemoteRuntimeRpcRequest
 } from './remote-runtime-memory-limits'
-import { getRemoteRuntimeRequestAdmissionEvidence } from './remote-runtime-prepared-request-admission'
+import { getRemoteRuntimeRequestAdmissionEvidence } from './remote-runtime/requests/remote-runtime-prepared-request-admission'
 import { remoteRuntimeClientCapabilities } from './remote-runtime-client-capabilities'
 import { RemoteRuntimeSharedControlConnection } from './remote-runtime-shared-control-connection'
 import * as sharedControlProtocol from './remote-runtime-shared-control-protocol'

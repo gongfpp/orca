@@ -10,7 +10,7 @@ import type {
   SharedControlPendingRequest,
   SharedControlReadyWaiter
 } from './remote-runtime-shared-control-types'
-import type { SharedControlRetiredRequestIds } from './remote-runtime-shared-control-retired-request-ids'
+import type { SharedControlRetiredRequestIds } from './remote-runtime/requests/remote-runtime-shared-control-retired-request-ids'
 
 export function handleRuntimeControlTextFrame(args: {
   frame: string

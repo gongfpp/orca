@@ -1,13 +1,13 @@
 import * as sharedControlProtocol from './remote-runtime-shared-control-protocol'
 import * as sharedControlState from './remote-runtime-shared-control-state'
-import { closeSharedControlConnectionSubscription } from './remote-runtime-shared-control-subscription-close'
-import * as sharedControlSubscriptions from './remote-runtime-shared-control-subscriptions'
+import { closeSharedControlConnectionSubscription } from './remote-runtime/requests/remote-runtime-shared-control-subscription-close'
+import * as sharedControlSubscriptions from './remote-runtime/requests/remote-runtime-shared-control-subscriptions'
 import * as sharedControlSend from './remote-runtime-shared-control-send'
 import type {
   SharedControlLogicalSubscription,
   SharedControlPendingRequest
 } from './remote-runtime-shared-control-types'
-import type { SharedControlRetiredRequestIds } from './remote-runtime-shared-control-retired-request-ids'
+import type { SharedControlRetiredRequestIds } from './remote-runtime/requests/remote-runtime-shared-control-retired-request-ids'
 
 export function sendSharedControlRequest(args: {
   pendingRequests: Map<string, SharedControlPendingRequest<unknown>>

@@ -1,7 +1,7 @@
 import { ensureElectronProxyFromEnvironment } from '../network/proxy-settings'
 import { getMainHttpClient } from '../network/http-client'
 import { withSpan } from '../observability/tracer'
-import type { JiraAuthType, JiraSite } from '../../shared/jira-types'
+import type { JiraAuthType, JiraSite } from '../../shared/jira/jira-types'
 import { isJiraGatewayBaseUrl } from './gateway-base-url'
 import { JiraApiError, toJiraApiError } from './jira-api-error'
 

@@ -5,7 +5,7 @@ import { serializeRemoteRuntimePayload } from './remote-runtime-memory-limits'
 import {
   invalidRemoteRuntimeResponseError,
   parseRemoteRuntimeRpcFrame
-} from './remote-runtime-request-frames'
+} from './remote-runtime/requests/remote-runtime-request-frames'
 import type {
   SharedControlConnectionState,
   SharedControlLogicalSubscription

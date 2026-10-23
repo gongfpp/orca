@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { requestSharedControl } from './remote-runtime-shared-control-requests'
+import { requestSharedControl } from './remote-runtime/requests/remote-runtime-shared-control-requests'
 import {
   refreshSharedControlPendingRequestTimeouts,
   resolveSharedControlPendingResponse

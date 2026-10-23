@@ -29,7 +29,7 @@ import { main } from './index'
 import { pairRuntimeEnvironment, useWorktreeAwarenessEnvironment } from './index-test-harness'
 import { buildWorktree, okFixture } from './test-fixtures'
 import { RuntimeClientError } from './runtime/types'
-import { JIRA_AGENT_ACCESS_RUNTIME_CAPABILITY } from '../shared/jira-agent-capability'
+import { JIRA_AGENT_ACCESS_RUNTIME_CAPABILITY } from '../shared/jira/jira-agent-capability'
 import { WORKTREE_LINKED_ITEMS_DELTA_RUNTIME_CAPABILITY } from '../shared/workspace-attachment-capabilities'
 import {
   getWorkspaceReferenceIdentity,

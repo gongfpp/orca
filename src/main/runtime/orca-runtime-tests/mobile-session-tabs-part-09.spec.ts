@@ -90,7 +90,6 @@ describe('OrcaRuntimeService', () => {
         renameTerminal: vi.fn(),
         focusTerminal: vi.fn(),
         closeTerminal: vi.fn(),
-        sleepWorktree: vi.fn(),
         resumeSleepingAgents,
         terminalFitOverrideChanged: vi.fn(),
         terminalDriverChanged: vi.fn()

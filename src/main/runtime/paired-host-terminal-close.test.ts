@@ -41,7 +41,6 @@ function pairedHostLeafRuntime(hostCall: HostCall, runtimeStore: typeof store = 
     focusTerminal: vi.fn(),
     closeTerminal: vi.fn(),
     closeTerminalTab,
-    sleepWorktree: vi.fn(),
     terminalFitOverrideChanged: vi.fn(),
     terminalDriverChanged: vi.fn()
   })

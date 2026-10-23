@@ -1,5 +1,5 @@
 import { requireStrictJiraSite } from './jira-read-failure'
-import type { JiraProjectStatusOrder, JiraTransition } from '../../shared/jira-types'
+import type { JiraProjectStatusOrder, JiraTransition } from '../../shared/jira/jira-types'
 import { acquire, release } from './request-queue'
 import { apiBasePath, JiraApiError, jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'

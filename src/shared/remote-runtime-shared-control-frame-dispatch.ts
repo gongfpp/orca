@@ -1,8 +1,8 @@
-import type { parseRemoteRuntimeRpcFrame } from './remote-runtime-request-frames'
+import type { parseRemoteRuntimeRpcFrame } from './remote-runtime/requests/remote-runtime-request-frames'
 import { logUnknownSharedControlResponse } from './remote-runtime-shared-control-diagnostics-log'
-import type { SharedControlRetiredRequestIds } from './remote-runtime-shared-control-retired-request-ids'
-import { sendRetiredSharedControlCleanupRequest } from './remote-runtime-shared-control-subscription-close'
-import { handleSharedControlLogicalResponse } from './remote-runtime-shared-control-subscriptions'
+import type { SharedControlRetiredRequestIds } from './remote-runtime/requests/remote-runtime-shared-control-retired-request-ids'
+import { sendRetiredSharedControlCleanupRequest } from './remote-runtime/requests/remote-runtime-shared-control-subscription-close'
+import { handleSharedControlLogicalResponse } from './remote-runtime/requests/remote-runtime-shared-control-subscriptions'
 import {
   refreshSharedControlPendingRequestTimeouts,
   resolveSharedControlPendingResponse

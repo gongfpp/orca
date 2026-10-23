@@ -1,6 +1,6 @@
 import type { RemoteRuntimeClientError } from './remote-runtime-client-error'
-import { releaseRemoteRuntimePreparedRequest } from './remote-runtime-prepared-request-admission'
-import { remoteRuntimeUnavailableError } from './remote-runtime-request-frames'
+import { releaseRemoteRuntimePreparedRequest } from './remote-runtime/requests/remote-runtime-prepared-request-admission'
+import { remoteRuntimeUnavailableError } from './remote-runtime/requests/remote-runtime-request-frames'
 import type { RuntimeRpcResponse } from './runtime-rpc-envelope'
 import type {
   SharedControlLogicalSubscription,

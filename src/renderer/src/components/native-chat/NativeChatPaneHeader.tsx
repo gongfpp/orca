@@ -100,12 +100,18 @@ export function NativeChatPaneHeader({
 export function nativeChatPaneHeader(
   view: Pick<
     NativeChatStructuredViewProps,
-    'tabId' | 'groupId' | 'sessionId' | 'agent' | 'isFocusedGroup' | 'contextMenuActions'
+    | 'tabId'
+    | 'groupId'
+    | 'sessionId'
+    | 'agent'
+    | 'isVisible'
+    | 'isFocusedGroup'
+    | 'contextMenuActions'
   >,
   worktreeId: string | null,
   colorScheme: React.CSSProperties['colorScheme']
 ): React.JSX.Element | null {
-  return worktreeId && view.groupId && !view.contextMenuActions ? (
+  return view.isVisible && worktreeId && view.groupId && !view.contextMenuActions ? (
     <NativeChatPaneHeader
       tabId={view.tabId}
       worktreeId={worktreeId}

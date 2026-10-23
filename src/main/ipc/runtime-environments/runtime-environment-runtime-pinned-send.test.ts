@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { requestSharedControl } from '../../../shared/remote-runtime-shared-control-requests'
+import { requestSharedControl } from '../../../shared/remote-runtime/requests/remote-runtime-shared-control-requests'
 import type { SharedControlPendingRequest } from '../../../shared/remote-runtime-shared-control-types'
 import type { KnownRuntimeEnvironment } from '../../../shared/runtime-environments'
 import { getPreferredPairedRuntimeConnection } from '../../../shared/runtime-environments'

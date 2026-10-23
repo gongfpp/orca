@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { spawnWorktreeTarget } from '../../shared/worktree/host-qualified-identity'
 import type { RuntimeClientEvent } from '../../shared/runtime-client-events'
 import type { RuntimeNotifier } from './runtime-notifier-contract'
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../shared/layout-owner-switch'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import {
   OWNED_SESSION_KINDS,
@@ -61,7 +60,7 @@ describe('owned-session teardown policy', () => {
       'project-removal': removal,
       sleep: {
         pty: 'stop',
-        'structured-chat': 'stop-pending-28445',
+        'structured-chat': 'stop',
         'host-browser': 'retain',
         launch: 'retain'
       },
@@ -105,22 +104,22 @@ describe('owned-session teardown policy', () => {
     )
   })
 
-  it('leaves the sleep to an attached renderer', async () => {
+  it('sleeps in main with a window attached, which only follows the notices', async () => {
     const { runtime, sleepPhases } = makeRuntime()
-    const sleepWorktree = vi.fn()
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: sleepManagedWorktree reads only sleepWorktree.
-    runtime.setNotifier({ sleepWorktree } as unknown as RuntimeNotifier)
+    const workspaceSleepChanged = vi.fn()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the sleep reads only workspaceSleepChanged.
+    runtime.setNotifier({ workspaceSleepChanged } as unknown as RuntimeNotifier)
 
     await runtime.sleepManagedWorktree(`id:${TEST_WORKTREE_ID}`)
 
-    if (ORCA_LAYOUT_OWNER_IS_MAIN) {
-      // Switch-on variant (ruled behaviour): main sleeps a workspace whose panes it lists itself.
-      expect(sleepWorktree).not.toHaveBeenCalled()
-      expect(sleepPhases()[0]).toBe('started')
-      return
-    }
-    expect(sleepWorktree).toHaveBeenCalledWith(TEST_WORKTREE_ID)
-    expect(sleepPhases()).toEqual([])
+    expect(workspaceSleepChanged.mock.calls.map(([notice]) => notice.phase)).toEqual([
+      'started',
+      'ended'
+    ])
+    expect(workspaceSleepChanged).toHaveBeenLastCalledWith(
+      expect.objectContaining({ worktreeId: TEST_WORKTREE_ID, slept: true })
+    )
+    expect(sleepPhases()[0]).toBe('started')
   })
 
   it("project removal finds a headless page's workspace through the browser bridge", async () => {

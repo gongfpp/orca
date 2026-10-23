@@ -1,5 +1,5 @@
 import { requireStrictJiraSite } from './jira-read-failure'
-import type { JiraComment } from '../../shared/jira-types'
+import type { JiraComment } from '../../shared/jira/jira-types'
 import {
   JIRA_IMAGE_MAX_BYTES,
   JIRA_IMAGE_MAX_REFERENCES,

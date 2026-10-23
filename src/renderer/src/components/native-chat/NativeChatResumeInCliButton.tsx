@@ -1,7 +1,10 @@
+import { useMemo } from 'react'
 import { SquareTerminal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAppStore } from '@/store'
+import type { AppState } from '@/store/types'
+import { selectFolderWorkspaces, selectWorktreesByRepo } from '@/store/workspace-record-selectors'
 import { translate } from '@/i18n/i18n'
 import { AI_VAULT_AGENTS } from '../../../../shared/ai-vault-types'
 import {
@@ -11,8 +14,43 @@ import {
 import {
   resolveTabSessionHistorySubject,
   resolveNativeChatCliForkIdentity,
+  type NativeChatCliForkIdentity,
   type NativeChatTabSession
 } from '../tab-bar/tab-session-history-switch'
+
+function createExecutionHostSelector(
+  tabId: string,
+  worktreeId: string,
+  sessionId: string,
+  agent: NativeChatTabSession['agent']
+) {
+  let worktrees: AppState['worktreesByRepo'] | undefined
+  let folders: AppState['folderWorkspaces'] | undefined
+  let groups: AppState['projectGroups'] | undefined
+  let repos: AppState['repos'] | undefined
+  let scope: NativeChatCliForkIdentity['executionHostScope'] | null = null
+  return (state: AppState) => {
+    const nextWorktrees = selectWorktreesByRepo(state)
+    const nextFolders = selectFolderWorkspaces(state)
+    if (
+      worktrees !== nextWorktrees ||
+      folders !== nextFolders ||
+      groups !== state.projectGroups ||
+      repos !== state.repos
+    ) {
+      scope =
+        resolveNativeChatCliForkIdentity(state, {
+          tab: { id: tabId, worktreeId },
+          nativeChat: { sessionId, agent }
+        })?.executionHostScope ?? null
+      worktrees = nextWorktrees
+      folders = nextFolders
+      groups = state.projectGroups
+      repos = state.repos
+    }
+    return scope
+  }
+}
 
 export function NativeChatResumeInCliButton({
   tabId,
@@ -24,10 +62,12 @@ export function NativeChatResumeInCliButton({
   nativeChat: NativeChatTabSession
 }): React.JSX.Element | null {
   const tab = { id: tabId, worktreeId }
-  const executionHostScope = useAppStore(
-    (state) =>
-      resolveNativeChatCliForkIdentity(state, { tab, nativeChat })?.executionHostScope ?? null
+  const { sessionId, agent: nativeAgent } = nativeChat
+  const selectExecutionHost = useMemo(
+    () => createExecutionHostSelector(tabId, worktreeId, sessionId, nativeAgent),
+    [tabId, worktreeId, sessionId, nativeAgent]
   )
+  const executionHostScope = useAppStore(selectExecutionHost)
   const pending = useNativeChatCliForkPending(
     executionHostScope ? { executionHostScope, sessionId: nativeChat.sessionId } : null
   )

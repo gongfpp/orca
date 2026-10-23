@@ -1,5 +1,5 @@
 import type { JiraClientForSite } from './authenticated-request'
-import type { JiraSiteSelection } from '../../shared/jira-types'
+import type { JiraSiteSelection } from '../../shared/jira/jira-types'
 
 export type JiraIssueSearchFailure = {
   error: unknown

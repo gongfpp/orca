@@ -1,5 +1,5 @@
-import { remoteRuntimeUnavailableError } from './remote-runtime-request-frames'
-import { takeRemoteRuntimePreparedRequest } from './remote-runtime-prepared-request-admission'
+import { remoteRuntimeUnavailableError } from './remote-runtime/requests/remote-runtime-request-frames'
+import { takeRemoteRuntimePreparedRequest } from './remote-runtime/requests/remote-runtime-prepared-request-admission'
 import { finishSharedControlSubscription } from './remote-runtime-shared-control-state'
 import type {
   SharedControlLogicalSubscription,

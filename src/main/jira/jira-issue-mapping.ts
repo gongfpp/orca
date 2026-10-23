@@ -8,7 +8,7 @@ import type {
   JiraSite,
   JiraStatus,
   JiraUser
-} from '../../shared/jira-types'
+} from '../../shared/jira/jira-types'
 import { adfToMarkdownText, textToAdf, type AdfToMarkdownOptions } from './adf-markdown'
 import {
   asRecord,

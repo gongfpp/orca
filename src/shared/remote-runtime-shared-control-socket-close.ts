@@ -1,7 +1,7 @@
 import type WebSocket from 'ws'
 import { logSharedControlSocketClose } from './remote-runtime-shared-control-diagnostics-log'
 import { closeSharedControlSocketState } from './remote-runtime-shared-control-state'
-import { finishCloseAfterReadySubscriptions } from './remote-runtime-shared-control-subscriptions'
+import { finishCloseAfterReadySubscriptions } from './remote-runtime/requests/remote-runtime-shared-control-subscriptions'
 import type {
   SharedControlConnectionState,
   SharedControlLogicalSubscription,

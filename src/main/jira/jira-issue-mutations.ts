@@ -4,7 +4,7 @@ import type {
   JiraIssueUpdate,
   JiraMutationResult,
   JiraSite
-} from '../../shared/jira-types'
+} from '../../shared/jira/jira-types'
 import { acquire, release } from './request-queue'
 import { apiBasePath, jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'

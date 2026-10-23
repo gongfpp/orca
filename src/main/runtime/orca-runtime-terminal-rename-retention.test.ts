@@ -41,7 +41,6 @@ describe('terminal rename before renderer graph hydration', () => {
         renameTerminal,
         focusTerminal: vi.fn(),
         closeTerminal: vi.fn(),
-        sleepWorktree: vi.fn(),
         terminalFitOverrideChanged: vi.fn(),
         terminalDriverChanged: vi.fn()
       })
@@ -209,7 +208,6 @@ describe('terminal view rename characterization', () => {
       renameTerminal,
       focusTerminal() {},
       closeTerminal() {},
-      sleepWorktree() {},
       terminalFitOverrideChanged() {},
       terminalDriverChanged() {}
     }

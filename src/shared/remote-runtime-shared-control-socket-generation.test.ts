@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { remoteRuntimeUnavailableError } from './remote-runtime-request-frames'
+import { remoteRuntimeUnavailableError } from './remote-runtime/requests/remote-runtime-request-frames'
 import { SharedControlSocketGeneration } from './remote-runtime-shared-control-socket-generation'
 
 describe('SharedControlSocketGeneration', () => {

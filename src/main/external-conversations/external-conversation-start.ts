@@ -71,7 +71,9 @@ export async function launchConversation(
   launcher: ConversationLauncher,
   input: ConversationLaunchInput,
   signal: AbortSignal,
-  writeLink: (workspace: AgentPaneWorkspace, paneKey: string) => void
+  writeLink: (workspace: AgentPaneWorkspace, paneKey: string) => void,
+  /** Called synchronously at publication with the agent's pane, null when it has none. */
+  onPublished: (paneKey: string | null) => void
 ): Promise<Delivery> {
   // Settled to its error, so a failed write waits for the launch instead of going unhandled.
   const surface: { published: boolean; linked: Promise<unknown> | null } = {
@@ -81,8 +83,9 @@ export async function launchConversation(
   const onSurfacePublished = (published: AgentLaunchPublishedSurface): void => {
     surface.published = true
     const { outcome } = published
-    if (outcome.kind === 'terminal' && outcome.paneKey) {
-      const paneKey = outcome.paneKey
+    const paneKey = outcome.kind === 'terminal' ? (outcome.paneKey ?? null) : null
+    onPublished(paneKey)
+    if (paneKey) {
       surface.linked = launcher
         .paneWorkspace(published.worktreeId)
         .then((workspace) => writeLink(workspace, paneKey))

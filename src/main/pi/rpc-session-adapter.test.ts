@@ -329,6 +329,16 @@ describe('Pi RPC session ownership and delivery', () => {
     expect(h.connection.closed).toBe(true)
   })
 
+  it('stops a run Pi starts on an idle session without a send', async () => {
+    const h = await setup()
+    h.connection.receive({ type: 'agent_start' })
+    await vi.waitFor(async () => expect((await h.rig.turns())[0]?.state).toBe('running'))
+    expect((await h.adapter.cancelTurn({ sessionId, fence: 7 })).cancelled).toBe(true)
+    expect(h.connection.requests).toContain('abort')
+    h.connection.receive({ type: 'agent_settled' })
+    await vi.waitFor(async () => expect((await h.rig.turns())[0]?.outcome).toBe('cancellation'))
+  })
+
   it('keeps a pending manual compaction cancellable and reports root/tree proof honestly', async () => {
     const h = await setup()
     const turnId = 'manual-compact'

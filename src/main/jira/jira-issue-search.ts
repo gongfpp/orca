@@ -4,7 +4,7 @@ import type {
   JiraIssueFilter,
   JiraIssueListFilters,
   JiraSiteSelection
-} from '../../shared/jira-types'
+} from '../../shared/jira/jira-types'
 import { buildJiraPresetJql } from '../../shared/jira/jira-preset-jql'
 import { acquire, release } from './request-queue'
 import { apiBasePath, jiraRequest, type JiraClientForSite } from './authenticated-request'

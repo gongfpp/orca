@@ -48,7 +48,6 @@ describe('OrcaRuntimeService', () => {
       renameTerminal: vi.fn(),
       closeTerminal: vi.fn(),
       closeSessionTab: vi.fn(),
-      sleepWorktree: vi.fn(),
       terminalFitOverrideChanged: vi.fn(),
       terminalDriverChanged: vi.fn()
     })
@@ -178,7 +177,6 @@ describe('OrcaRuntimeService', () => {
         renameTerminal: vi.fn(),
         closeTerminal,
         closeSessionTab: vi.fn(),
-        sleepWorktree: vi.fn(),
         terminalFitOverrideChanged: vi.fn(),
         terminalDriverChanged: vi.fn()
       })
@@ -290,7 +288,6 @@ describe('OrcaRuntimeService', () => {
         renameTerminal: vi.fn(),
         closeTerminal,
         closeSessionTab: vi.fn(),
-        sleepWorktree: vi.fn(),
         terminalFitOverrideChanged: vi.fn(),
         terminalDriverChanged: vi.fn()
       })
