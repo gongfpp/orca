@@ -12,12 +12,11 @@ export function useBrowserPageWebviewPartition({
   sessionPartition: string | null
 }): string {
   // Why the local list first: this webview renders here, while Settings may be showing a paired host's profiles.
-  const browserSessionProfiles = useAppStore(
-    (s) => s.browserSessionProfilesByHostId[LOCAL_EXECUTION_HOST_ID] ?? s.browserSessionProfiles
+  const localProfiles = useAppStore(
+    (s) => s.browserSessionProfilesByHostId[LOCAL_EXECUTION_HOST_ID]
   )
-  const localProfilesLoaded = useAppStore(
-    (s) => s.browserSessionProfilesByHostId[LOCAL_EXECUTION_HOST_ID] !== undefined
-  )
+  const mirroredProfiles = useAppStore((s) => s.browserSessionProfiles)
+  const browserSessionProfiles = localProfiles ?? mirroredProfiles
   const activeOrcaProfileId = useAppStore((s) => s.activeOrcaProfileId)
   const fallbackBrowserPartition = activeOrcaProfileId
     ? getOrcaProfileBrowserDefaultPartition(activeOrcaProfileId)
@@ -30,7 +29,7 @@ export function useBrowserPageWebviewPartition({
     return sessionPartition
   }
   // Why: a profile missing from main's loaded list was deleted; its tab must load nowhere, not in Default's jar.
-  if (sessionProfileId && !sessionProfile && localProfilesLoaded) {
+  if (sessionProfileId && !sessionProfile && localProfiles) {
     return unadmittedBrowserPartition(sessionProfileId)
   }
   return (
