@@ -26,7 +26,6 @@ import {
 } from './browser-webauthn-access'
 import { noticeDocPreviewDownloadBlocked } from './doc-preview-download-block-notice'
 import { isRemoteCliDrivenGuest } from './desktop-browser-bridge/remote-cli-driven-workspaces'
-import { isBrowserRoutePartition } from './browser-route-identity'
 
 const configuredPartitions = new Set<string>()
 const userAgentPolicyDisposerBySession = new WeakMap<Session, () => void>()
@@ -143,6 +142,8 @@ export async function installBrowserSessionPartitionPolicies(
     downloads?: BrowserPartitionDownloadPolicy
     permissions?: BrowserPartitionPermissionPolicy
     applyAppWideProxy?: boolean
+    /** Off where another machine can script pages and reuse their stored file handles. */
+    fileSystemAccess?: boolean
     userAgentExceptions?: boolean
     /** Session-only answers are not persisted to a browser profile. */
     sitePermissions?: 'saved' | 'session'
@@ -168,11 +169,12 @@ export async function installBrowserSessionPartitionPolicies(
     sess.setPermissionCheckHandler(() => false)
     clearBrowserWebAuthnAccessHandlers(sess)
   } else {
-    // Another machine can script routed pages and could reuse their stored file handles.
-    const deniesFileSystem = isBrowserRoutePartition(partition)
+    // Electron answers every File System Access grant here, overriding Chromium's own;
+    // the user's pick or drop is the consent, and handles a site stores keep their access.
+    const grantsFileSystem = options.fileSystemAccess !== false
     const isAutoGranted = (permission: string): boolean =>
-      isAutoGrantedBrowserSessionPermission(permission) &&
-      !(deniesFileSystem && permission === 'fileSystem')
+      isAutoGrantedBrowserSessionPermission(permission) ||
+      (grantsFileSystem && permission === 'fileSystem')
     const siteMemory =
       options.sitePermissions === 'session'
         ? sessionBrowserSitePermissions(partition)

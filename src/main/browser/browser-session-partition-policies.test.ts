@@ -370,9 +370,11 @@ describe('partition permission policy', () => {
 
   it('gives browsing pages File System Access but keeps it from pages another machine can script', async () => {
     const install = await loadInstaller()
+    const { installBrowserRoutePartitionPolicies } =
+      await import('./browser-session-route-policies')
     const routed = `persist:orca-browser-v1-${'a'.repeat(64)}`
     install(profileFor('persist:browsing-5'))
-    install(profileFor(routed))
+    void installBrowserRoutePartitionPolicies(profileFor('persist:browsing-5'), routed)
     const decide = (partition: string) => {
       const sess = sessionsByPartition.get(partition)
       if (!sess) {

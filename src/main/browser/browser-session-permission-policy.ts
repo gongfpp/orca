@@ -9,10 +9,7 @@ const AUTO_GRANTED_BROWSER_PERMISSIONS = new Set([
   // Match Orca's unpartitioned third-party cookie policy; request and check must agree.
   // This also grants unpartitioned localStorage/IndexedDB handles, unlike ambient globals.
   // Revisit if partitioning becomes configurable: Electron does not persist a STORAGE_ACCESS grant.
-  'storage-access',
-  // Electron answers every File System Access grant here, overriding Chromium's own.
-  // The user's pick or drop is the consent; handles a site stores keep their access.
-  'fileSystem'
+  'storage-access'
 ])
 // Top-level storage access requires Related Website Sets, which Orca does not supply.
 
