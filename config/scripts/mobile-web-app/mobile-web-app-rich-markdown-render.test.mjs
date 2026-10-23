@@ -692,10 +692,14 @@ describeEditor(
             // per-mount leak would move is the snapshot after one whole cycle, not before it.
             await page.evaluate(() => globalThis.__orcaEditor.set({ mounted: false }))
             await page.waitForFunction(() => document.querySelector('#first-surface') === null)
+            // React's passive-effect cleanup can run after the surface leaves the DOM.
+            await expect
+              .poll(
+                async () => Object.keys(await listeners()).filter((key) => key.startsWith('element ')),
+                { timeout: 15_000 }
+              )
+              .toEqual([])
             const afterOneCycle = await listeners()
-            expect(Object.keys(afterOneCycle).filter((key) => key.startsWith('element '))).toEqual(
-              []
-            )
             // The precondition that makes the comparison below non-vacuous: the recorder is reading
             // real listeners, so a snapshot of nothing cannot pass as a snapshot of no leak.
             expect(Object.keys(afterOneCycle).length).toBeGreaterThan(0)
