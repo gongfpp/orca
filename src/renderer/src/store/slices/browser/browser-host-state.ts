@@ -134,9 +134,10 @@ export function profileListByHostUpdate(
   hostId: ExecutionHostId = getBrowserSettingsHostId(state)
 ): Partial<BrowserSlice> {
   const isSettingsHost = getBrowserSettingsHostId(state) === hostId
-  // Why: a default the host no longer lists would send every new tab to a deleted profile.
+  // Why: a default the host no longer lists would send every new tab to a deleted profile. A real
+  // listing always holds Default; the empty list a failed fetch writes proves nothing was deleted.
   const isUnlisted = (profileId: string | null | undefined): boolean =>
-    !!profileId && !profiles.some((profile) => profile.id === profileId)
+    !!profileId && profiles.length > 0 && !profiles.some((profile) => profile.id === profileId)
   return {
     ...(isSettingsHost ? { browserSessionProfiles: profiles } : {}),
     browserSessionProfilesByHostId: {

@@ -86,6 +86,21 @@ describe('createBrowserSlice runtime guard', () => {
     ])
   })
 
+  it('keeps the default profile pick when a server profile fetch fails', async () => {
+    const store = createTestStore()
+    runtimeEnvironmentCall.mockRejectedValueOnce(new Error('timed out'))
+    store.setState({
+      settings: settingsWithRuntime('env-1'),
+      defaultBrowserSessionProfileId: 'work',
+      defaultBrowserSessionProfileIdByHostId: { 'runtime:env-1': 'work' }
+    })
+
+    await store.getState().fetchBrowserSessionProfiles()
+
+    expect(store.getState().defaultBrowserSessionProfileId).toBe('work')
+    expect(store.getState().defaultBrowserSessionProfileIdByHostId['runtime:env-1']).toBe('work')
+  })
+
   it('creates a profile in the active runtime environment', async () => {
     const store = createTestStore()
     const profile = {
