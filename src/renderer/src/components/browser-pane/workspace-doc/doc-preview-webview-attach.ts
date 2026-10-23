@@ -34,8 +34,7 @@ export function attachDocPreviewWebview({
   // Why no allowpopups: the guest's preload intercepts a trusted click on a link before Chromium
   // considers a popup at all, so target="_blank" needs no popup path and every one stays denied.
   webview.setAttribute('partition', DOC_PREVIEW_PARTITION)
-  // Why opaque: only then does Chromium paint its dark canvas for dark-scheme documents (JSON, text,
-  // color-scheme: light dark) instead of white text on white; unstyled ones stay white.
+  // Why opaque: Chromium paints its dark canvas for dark-scheme documents (JSON, text) only then.
   webview.setAttribute('webpreferences', ORCA_BROWSER_PAGE_GUEST_WEB_PREFERENCES_ATTRIBUTE)
   webview.setAttribute('aria-label', ariaLabel)
   webview.style.display = 'flex'
