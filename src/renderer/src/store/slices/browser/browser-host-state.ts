@@ -124,17 +124,36 @@ export function isLocalBrowserPageOwner(
 export function profileListByHostUpdate(
   state: Pick<
     AppState,
-    'browserSessionHostIdOverride' | 'browserSessionProfilesByHostId' | 'settings'
+    | 'browserSessionHostIdOverride'
+    | 'browserSessionProfilesByHostId'
+    | 'defaultBrowserSessionProfileId'
+    | 'defaultBrowserSessionProfileIdByHostId'
+    | 'settings'
   >,
   profiles: BrowserSessionProfile[],
   hostId: ExecutionHostId = getBrowserSettingsHostId(state)
 ): Partial<BrowserSlice> {
+  const isSettingsHost = getBrowserSettingsHostId(state) === hostId
+  // Why: a default the host no longer lists would send every new tab to a deleted profile.
+  const isUnlisted = (profileId: string | null | undefined): boolean =>
+    !!profileId && !profiles.some((profile) => profile.id === profileId)
   return {
-    ...(getBrowserSettingsHostId(state) === hostId ? { browserSessionProfiles: profiles } : {}),
+    ...(isSettingsHost ? { browserSessionProfiles: profiles } : {}),
     browserSessionProfilesByHostId: {
       ...state.browserSessionProfilesByHostId,
       [hostId]: profiles
-    }
+    },
+    ...(isSettingsHost && isUnlisted(state.defaultBrowserSessionProfileId)
+      ? { defaultBrowserSessionProfileId: null }
+      : {}),
+    ...(isUnlisted(state.defaultBrowserSessionProfileIdByHostId[hostId])
+      ? {
+          defaultBrowserSessionProfileIdByHostId: {
+            ...state.defaultBrowserSessionProfileIdByHostId,
+            [hostId]: null
+          }
+        }
+      : {})
   }
 }
 

@@ -349,6 +349,31 @@ describe('createBrowserSlice runtime guard', () => {
     ])
   })
 
+  it('drops the default profile pick once a refreshed list no longer has it', async () => {
+    const store = createTestStore()
+    const listed = (id: string) => ({
+      id,
+      scope: id === 'default' ? ('default' as const) : ('isolated' as const),
+      partition: `persist:${id}`,
+      label: id,
+      source: null
+    })
+    store.setState({
+      defaultBrowserSessionProfileId: 'work',
+      defaultBrowserSessionProfileIdByHostId: { local: 'work' }
+    })
+    mockApi.browser.sessionListProfiles
+      .mockResolvedValueOnce([listed('default'), listed('work')])
+      .mockResolvedValueOnce([listed('default')])
+
+    await store.getState().fetchBrowserSessionProfiles('local')
+    expect(store.getState().defaultBrowserSessionProfileIdByHostId.local).toBe('work')
+
+    await store.getState().fetchBrowserSessionProfiles('local')
+    expect(store.getState().defaultBrowserSessionProfileId).toBeNull()
+    expect(store.getState().defaultBrowserSessionProfileIdByHostId.local).toBeNull()
+  })
+
   it('creates a profile through local browser IPC', async () => {
     const store = createTestStore()
     const profile = {
