@@ -1,19 +1,23 @@
 import { describe, expect, it, vi } from 'vitest'
 import { enableGuestPinchZoom, pinchGuestPage } from './browser-guest-pinch-zoom'
 
-function fakeGuest(viewport: {
-  width: number
-  height: number
+type Viewport = {
   offsetX: number
   offsetY: number
+  clientWidth: number
+  clientHeight: number
   scale: number
   zoom: number
-}) {
-  const sendCommand = vi.fn(async (method: string) =>
+}
+
+// Metrics before and after Emulation.setPageScaleFactor, as Blink reports them.
+function fakeGuest(before: Viewport, after: Viewport) {
+  const visualViewports = [before, after]
+  const sendCommand = vi.fn(async (method: string, _params?: object) =>
     method === 'Page.getLayoutMetrics'
       ? {
-          cssLayoutViewport: { clientWidth: viewport.width, clientHeight: viewport.height },
-          cssVisualViewport: viewport
+          cssLayoutViewport: { clientWidth: 1000, clientHeight: 800 },
+          cssVisualViewport: visualViewports.shift()
         }
       : {}
   )
@@ -24,6 +28,10 @@ function fakeGuest(viewport: {
   } as unknown as Electron.WebContents
   return { guest, sendCommand }
 }
+
+const settled = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
+const pageMethods = (sendCommand: ReturnType<typeof fakeGuest>['sendCommand']): string[] =>
+  sendCommand.mock.calls.map(([method]) => method)
 
 describe('browser guest pinch zoom', () => {
   it('keeps Orca unpinchable without waiting for the guest renderer', () => {
@@ -49,43 +57,47 @@ describe('browser guest pinch zoom', () => {
   })
 
   it('scales the page and keeps the point under the fingers in place', async () => {
-    const { guest, sendCommand } = fakeGuest({
-      width: 1000,
-      height: 800,
-      offsetX: 0,
-      offsetY: 0,
-      scale: 1,
-      zoom: 1.25
-    })
+    const { guest, sendCommand } = fakeGuest(
+      { offsetX: 0, offsetY: 0, clientWidth: 1000, clientHeight: 800, scale: 1, zoom: 1.25 },
+      { offsetX: 0, offsetY: 0, clientWidth: 500, clientHeight: 400, scale: 2, zoom: 1.25 }
+    )
 
     pinchGuestPage(guest, { deltaY: -100 * Math.log(2), x: 0.5, y: 0.25 })
+    await settled()
 
-    await vi.waitFor(() => expect(sendCommand).toHaveBeenCalledTimes(3))
     expect(sendCommand.mock.calls[1][1]).toEqual({ pageScaleFactor: expect.closeTo(2) })
     // The anchor moves 250 x 100 CSS px; wheel deltas are DIP, so times scale 2 and page zoom 1.25.
-    expect(sendCommand.mock.calls[2][1]).toMatchObject({
+    expect(sendCommand.mock.calls[3][1]).toMatchObject({
       type: 'mouseWheel',
       deltaX: expect.closeTo(625),
       deltaY: expect.closeTo(250)
     })
   })
 
-  it('does not pan when zooming out pins the viewport to its edge', async () => {
-    const { guest, sendCommand } = fakeGuest({
-      width: 1000,
-      height: 800,
-      offsetX: 500,
-      offsetY: 400,
-      scale: 2,
-      zoom: 1
-    })
+  it.each([
+    [
+      'zooming out pins the viewport to its edge',
+      100 * Math.log(4),
+      { offsetX: 500, offsetY: 400, clientWidth: 500, clientHeight: 400, scale: 2, zoom: 1 },
+      { offsetX: 0, offsetY: 0, clientWidth: 1000, clientHeight: 800, scale: 1, zoom: 1 }
+    ],
+    [
+      'the page refuses to scale (maximum-scale=1 under mobile emulation)',
+      -50,
+      { offsetX: 0, offsetY: 0, clientWidth: 1000, clientHeight: 800, scale: 1, zoom: 1 },
+      { offsetX: 0, offsetY: 0, clientWidth: 1000, clientHeight: 800, scale: 1, zoom: 1 }
+    ]
+  ])('does not pan when %s', async (_case, deltaY, before, after) => {
+    const { guest, sendCommand } = fakeGuest(before, after)
 
-    pinchGuestPage(guest, { deltaY: 100 * Math.log(4), x: 0.9, y: 0.9 })
+    pinchGuestPage(guest, { deltaY, x: 0.9, y: 0.9 })
+    await settled()
 
-    await vi.waitFor(() => expect(sendCommand).toHaveBeenCalledTimes(2))
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(sendCommand.mock.calls[1][1]).toEqual({ pageScaleFactor: 1 })
-    // A leftover pan at scale 1 would scroll the page itself.
-    expect(sendCommand).toHaveBeenCalledTimes(2)
+    // A leftover pan would scroll the page itself.
+    expect(pageMethods(sendCommand)).toEqual([
+      'Page.getLayoutMetrics',
+      'Emulation.setPageScaleFactor',
+      'Page.getLayoutMetrics'
+    ])
   })
 })

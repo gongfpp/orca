@@ -57,28 +57,38 @@ function takePinch(guest: Electron.WebContents): BrowserPagePinch | undefined {
 
 type ViewportMetrics = {
   cssLayoutViewport: { clientWidth: number; clientHeight: number }
-  cssVisualViewport: { offsetX: number; offsetY: number; scale: number; zoom?: number }
+  cssVisualViewport: {
+    offsetX: number
+    offsetY: number
+    clientWidth: number
+    clientHeight: number
+    scale: number
+    zoom?: number
+  }
 }
 
 async function applyPinch(guest: Electron.WebContents, pinch: BrowserPagePinch): Promise<void> {
-  const metrics: ViewportMetrics = await guest.debugger.sendCommand('Page.getLayoutMetrics')
-  const { clientWidth, clientHeight } = metrics.cssLayoutViewport
-  const { offsetX, offsetY, scale, zoom = 1 } = metrics.cssVisualViewport
-  // Chromium's pinch wheel carries deltaY = -100 * ln(scale change).
-  const nextScale = Math.min(MAX_PINCH_SCALE, Math.max(1, scale * Math.exp(-pinch.deltaY / 100)))
-  if (nextScale === scale) {
+  const readMetrics = (): Promise<ViewportMetrics> =>
+    guest.debugger.sendCommand('Page.getLayoutMetrics')
+  const { cssVisualViewport: before } = await readMetrics()
+  // Chromium's pinch wheel carries deltaY = -100 * ln(scale change); Blink clamps to the page's limits.
+  await guest.debugger.sendCommand('Emulation.setPageScaleFactor', {
+    pageScaleFactor: before.scale * Math.exp(-pinch.deltaY / 100)
+  })
+  const { cssLayoutViewport: layout, cssVisualViewport: after } = await readMetrics()
+  if (after.scale === before.scale) {
     return
   }
-  await guest.debugger.sendCommand('Emulation.setPageScaleFactor', { pageScaleFactor: nextScale })
-  // Keep the page point under the fingers in place; Blink kept the offset, clamped to the new scale.
-  const pan = (offset: number, fraction: number, size: number): number => {
-    const max = size - size / nextScale
-    const target = offset + fraction * size * (1 / scale - 1 / nextScale)
-    return Math.min(max, Math.max(0, target)) - Math.min(max, offset)
+  // Keep the page point under the fingers in place, within the layout viewport.
+  const pan = (fraction: number, axis: 'X' | 'Y'): number => {
+    const size = axis === 'X' ? 'clientWidth' : 'clientHeight'
+    const offset = `offset${axis}` as const
+    const target = before[offset] + fraction * (before[size] - after[size])
+    return Math.min(layout[size] - after[size], Math.max(0, target)) - after[offset]
   }
-  const dipPerCssPixel = nextScale * zoom
-  const deltaX = pan(offsetX, pinch.x, clientWidth) * dipPerCssPixel
-  const deltaY = pan(offsetY, pinch.y, clientHeight) * dipPerCssPixel
+  const dipPerCssPixel = after.scale * (after.zoom ?? 1)
+  const deltaX = pan(pinch.x, 'X') * dipPerCssPixel
+  const deltaY = pan(pinch.y, 'Y') * dipPerCssPixel
   if (deltaX === 0 && deltaY === 0) {
     return
   }
