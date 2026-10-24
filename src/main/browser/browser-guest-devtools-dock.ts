@@ -45,7 +45,7 @@ export class BrowserGuestDevToolsDock {
       guest.closeDevTools()
     }
     let crashed = false
-    let reconnecting: { bounds: Electron.Rectangle; visible: boolean } | null = null
+    let reconnecting = false
     const handleCrash = (): void => {
       crashed = true
     }
@@ -55,7 +55,7 @@ export class BrowserGuestDevToolsDock {
       const dock = this.docks.get(guest.id)
       if (crashed && dock && !reconnecting) {
         crashed = false
-        reconnecting = { bounds: dock.view.getBounds(), visible: dock.view.getVisible() }
+        reconnecting = true
         destroyView(window, dock.view)
       }
     }
@@ -63,10 +63,12 @@ export class BrowserGuestDevToolsDock {
     const handleClosed = (): void => {
       const dock = this.docks.get(guest.id)
       if (dock && reconnecting) {
+        reconnecting = false
+        // The stale view kept taking bounds while it detached, so it holds the latest ones.
+        const stale = dock.view
         dock.view = attachDevToolsView(guest, window)
-        dock.view.setBounds(reconnecting.bounds)
-        dock.view.setVisible(reconnecting.visible)
-        reconnecting = null
+        dock.view.setBounds(stale.getBounds())
+        dock.view.setVisible(stale.getVisible())
         return
       }
       void this.close(guest.id)

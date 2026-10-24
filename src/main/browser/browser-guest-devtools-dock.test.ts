@@ -138,11 +138,13 @@ describe('BrowserGuestDevToolsDock', () => {
 
   it('reconnects a fresh frontend in the same place once a crashed page is back', async () => {
     const { dock, guest, onClosed } = await openDock()
-    await dock.setBounds(GUEST_ID, { x: 10, y: 20, width: 300, height: 200 }, false)
+    await dock.setBounds(GUEST_ID, { x: 0, y: 0, width: 100, height: 100 }, false)
     const [stale] = electronMocks.views
 
     guest.emit('render-process-gone')
     guest.emit('dom-ready')
+    // The pane moved while the stale host was still detaching.
+    await dock.setBounds(GUEST_ID, { x: 10, y: 20, width: 300, height: 200 }, false)
     await tick()
 
     const fresh = electronMocks.views[1]

@@ -60,7 +60,11 @@ const OVERLAY_LAYER_SELECTOR = `${OVERLAY_SELECTOR}, [data-radix-popper-content-
  *  holding `owner`, like a floating workspace showing the page, are under it, not over it. */
 export function hasVisibleOverlayOver(rect: DOMRectReadOnly, owner: Element): boolean {
   return Array.from(document.querySelectorAll(OVERLAY_LAYER_SELECTOR)).some((element) => {
-    if (element.contains(owner) || element.closest('[aria-hidden="true"]')) {
+    // Painted, not accessible: a modal's hideOthers() marks its own backdrop aria-hidden.
+    if (
+      element.contains(owner) ||
+      !element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
+    ) {
       return false
     }
     const box = element.getBoundingClientRect()
