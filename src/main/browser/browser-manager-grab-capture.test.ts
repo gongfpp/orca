@@ -37,42 +37,53 @@ describe('browserManager grab operations', () => {
   })
 
   describe('captureSelectionScreenshot', () => {
-    it('captures, crops, and converts screenshot dimensions back to CSS pixels', async () => {
-      const cropMock = vi.fn(() => ({
-        toPNG: vi.fn(() => Buffer.from('png-data'))
-      }))
-      guestCapturePageMock.mockResolvedValue({
-        isEmpty: vi.fn(() => false),
-        getSize: vi.fn(() => ({ width: 2000, height: 1000 })),
-        crop: cropMock
-      })
-      guestExecuteJavaScriptMock.mockImplementation(async (script: string) =>
-        script === 'window.innerWidth' ? 1000 : undefined
-      )
+    it.each([
+      ['an unzoomed page', { width: 1000, scale: 1, left: 0, top: 0 }, { x: 10, y: 20 }, 2],
+      // A trackpad pinch scales and offsets the visual viewport the capture shows.
+      ['a pinch-zoomed page', { width: 1000, scale: 2, left: 100, top: 50 }, { x: 105, y: 60 }, 4]
+    ])(
+      'captures, crops, and converts screenshot dimensions back to CSS pixels on %s',
+      async (_case, viewport, origin, bitmapPerCssPixel) => {
+        const cropMock = vi.fn(() => ({
+          toPNG: vi.fn(() => Buffer.from('png-data'))
+        }))
+        guestCapturePageMock.mockResolvedValue({
+          isEmpty: vi.fn(() => false),
+          getSize: vi.fn(() => ({ width: 2000, height: 1000 })),
+          crop: cropMock
+        })
+        guestExecuteJavaScriptMock.mockImplementation(async (script: string) =>
+          script.includes('visualViewport') ? viewport : undefined
+        )
 
-      const screenshot = await browserManager.captureSelectionScreenshot(
-        'tab-1',
-        { x: 10, y: 20, width: 100, height: 50 },
-        guest
-      )
+        const screenshot = await browserManager.captureSelectionScreenshot(
+          'tab-1',
+          { ...origin, width: 100, height: 50 },
+          guest
+        )
 
-      expect(cropMock).toHaveBeenCalledWith({ x: 20, y: 40, width: 200, height: 100 })
-      expect(screenshot).toEqual({
-        mimeType: 'image/png',
-        dataUrl: `data:image/png;base64,${Buffer.from('png-data').toString('base64')}`,
-        width: 100,
-        height: 50
-      })
-      expect(guestExecuteJavaScriptMock).toHaveBeenNthCalledWith(
-        1,
-        expect.stringContaining('__orcaGrab')
-      )
-      expect(guestExecuteJavaScriptMock).toHaveBeenNthCalledWith(
-        2,
-        expect.stringContaining('__orcaGrab')
-      )
-      expect(guestExecuteJavaScriptMock).toHaveBeenNthCalledWith(3, 'window.innerWidth')
-    })
+        expect(cropMock).toHaveBeenCalledWith({
+          x: (origin.x - viewport.left) * bitmapPerCssPixel,
+          y: (origin.y - viewport.top) * bitmapPerCssPixel,
+          width: 100 * bitmapPerCssPixel,
+          height: 50 * bitmapPerCssPixel
+        })
+        expect(screenshot).toEqual({
+          mimeType: 'image/png',
+          dataUrl: `data:image/png;base64,${Buffer.from('png-data').toString('base64')}`,
+          width: 100,
+          height: 50
+        })
+        expect(guestExecuteJavaScriptMock).toHaveBeenNthCalledWith(
+          1,
+          expect.stringContaining('__orcaGrab')
+        )
+        expect(guestExecuteJavaScriptMock).toHaveBeenNthCalledWith(
+          2,
+          expect.stringContaining('__orcaGrab')
+        )
+      }
+    )
 
     it('omits screenshots that exceed the byte budget', async () => {
       const oversizedBuffer = Buffer.alloc(GRAB_BUDGET.screenshotMaxBytes + 1)
@@ -84,7 +95,7 @@ describe('browserManager grab operations', () => {
         }))
       })
       guestExecuteJavaScriptMock.mockImplementation(async (script: string) =>
-        script === 'window.innerWidth' ? 1000 : undefined
+        script.includes('visualViewport') ? { width: 1000, scale: 1, left: 0, top: 0 } : undefined
       )
 
       const screenshot = await browserManager.captureSelectionScreenshot(

@@ -48,14 +48,18 @@ export async function captureSelectionScreenshot(
 
     const bitmapSize = image.getSize()
     // Derive bitmap/CSS scaling from this guest, avoiding primary-display DPI assumptions.
-    const viewportCSSWidth: number = await guest.executeJavaScript('window.innerWidth')
-    if (!viewportCSSWidth || viewportCSSWidth <= 0) {
+    // The capture shows the visual viewport, which a trackpad pinch scales and offsets.
+    const viewport: { width: number; scale: number; left: number; top: number } =
+      await guest.executeJavaScript(
+        '({ width: window.innerWidth, scale: visualViewport.scale, left: visualViewport.offsetLeft, top: visualViewport.offsetTop })'
+      )
+    if (!viewport.width || viewport.width <= 0) {
       return null
     }
-    const scaleFactor = bitmapSize.width / viewportCSSWidth
+    const scaleFactor = (bitmapSize.width / viewport.width) * viewport.scale
 
-    const cropX = Math.max(0, Math.round(safeRect.x * scaleFactor))
-    const cropY = Math.max(0, Math.round(safeRect.y * scaleFactor))
+    const cropX = Math.max(0, Math.round((safeRect.x - viewport.left) * scaleFactor))
+    const cropY = Math.max(0, Math.round((safeRect.y - viewport.top) * scaleFactor))
     const cropW = Math.min(bitmapSize.width - cropX, Math.round(safeRect.width * scaleFactor))
     const cropH = Math.min(bitmapSize.height - cropY, Math.round(safeRect.height * scaleFactor))
 

@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { enableGuestPinchZoom, pinchGuestPage } from './browser-guest-pinch-zoom'
+import {
+  enableGuestPinchZoom,
+  pinchGuestPage,
+  resetGuestPinchZoom
+} from './browser-guest-pinch-zoom'
 
 type Viewport = {
   offsetX: number
@@ -75,6 +79,22 @@ describe('browser guest pinch zoom', () => {
       deltaX: expect.closeTo(625),
       deltaY: expect.closeTo(250)
     })
+  })
+
+  it('lets Reset zoom win over a pinch already in flight', async () => {
+    const { guest, sendCommand } = fakeGuest(
+      { offsetX: 0, offsetY: 0, clientWidth: 1000, clientHeight: 800, scale: 1, zoom: 1 },
+      { offsetX: 0, offsetY: 0, clientWidth: 500, clientHeight: 400, scale: 2, zoom: 1 }
+    )
+
+    pinchGuestPage(guest, { deltaY: -100 * Math.log(2), x: 0.5, y: 0.5 })
+    resetGuestPinchZoom(guest)
+    await settled()
+
+    expect(sendCommand.mock.calls.at(-1)).toEqual([
+      'Emulation.setPageScaleFactor',
+      { pageScaleFactor: 1 }
+    ])
   })
 
   it.each([

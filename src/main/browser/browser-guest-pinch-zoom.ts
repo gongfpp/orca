@@ -9,8 +9,9 @@ const MAX_PINCH_SCALE = process.platform === 'darwin' ? 3 : 4
 // Why: a wheel this far outside the viewport hits no element, so only the visual viewport pans and the page sees no wheel event.
 const VIEWPORT_ONLY_WHEEL_POINT = 100_000
 
-const pendingPinchByGuest = new WeakMap<Electron.WebContents, BrowserPagePinch>()
-const flushingGuests = new WeakSet<Electron.WebContents>()
+type PinchJob = BrowserPagePinch | 'reset'
+
+const pendingJobsByGuest = new WeakMap<Electron.WebContents, PinchJob[]>()
 
 export function enableGuestPinchZoom(guest: Electron.WebContents): void {
   const embedder = guest.hostWebContents
@@ -25,50 +26,48 @@ export function enableGuestPinchZoom(guest: Electron.WebContents): void {
 
 // Why: Chromium hands a pinch over a <webview> to the embedder, so Orca applies it to the guest's visual viewport.
 export function pinchGuestPage(guest: Electron.WebContents, pinch: BrowserPagePinch): void {
-  const pending = pendingPinchByGuest.get(guest)
-  pendingPinchByGuest.set(guest, { ...pinch, deltaY: (pending?.deltaY ?? 0) + pinch.deltaY })
-  if (!flushingGuests.has(guest)) {
-    void flushPinches(guest)
+  const jobs = pendingJobsByGuest.get(guest) ?? []
+  const last = jobs.at(-1)
+  if (last && last !== 'reset') {
+    jobs[jobs.length - 1] = { ...pinch, deltaY: last.deltaY + pinch.deltaY }
+  } else {
+    jobs.push(pinch)
+  }
+  queueJobs(guest, jobs)
+}
+
+// Reset zoom clears the pinch too, as Chrome does; it queues behind an in-flight pinch so it wins.
+export function resetGuestPinchZoom(guest: Electron.WebContents): void {
+  queueJobs(guest, ['reset'])
+}
+
+function queueJobs(guest: Electron.WebContents, jobs: PinchJob[]): void {
+  const flushing = pendingJobsByGuest.has(guest)
+  pendingJobsByGuest.set(guest, jobs)
+  if (!flushing) {
+    void flushJobs(guest, jobs)
   }
 }
 
-async function flushPinches(guest: Electron.WebContents): Promise<void> {
-  flushingGuests.add(guest)
+async function flushJobs(guest: Electron.WebContents, jobs: PinchJob[]): Promise<void> {
   let release: (() => void) | null = null
   try {
     release = acquireElectronDebugger(guest).release
-    for (let pinch = takePinch(guest); pinch; pinch = takePinch(guest)) {
-      await applyPinch(guest, pinch)
+    for (let job = jobs.shift(); job; job = pendingJobsByGuest.get(guest)?.shift()) {
+      if (guest.isDestroyed()) {
+        break
+      }
+      await (job === 'reset'
+        ? guest.debugger.sendCommand('Emulation.setPageScaleFactor', { pageScaleFactor: 1 })
+        : applyPinch(guest, job))
     }
   } catch (error) {
-    pendingPinchByGuest.delete(guest)
+    // DevTools can hold the debugger; a new document resets the scale anyway.
     console.warn('[browser-pinch-zoom] failed to zoom the page', { error: errorMessage(error) })
   } finally {
     release?.()
-    flushingGuests.delete(guest)
+    pendingJobsByGuest.delete(guest)
   }
-}
-
-// Reset zoom clears the pinch too, as Chrome does.
-export function resetGuestPinchZoom(guest: Electron.WebContents): void {
-  pendingPinchByGuest.delete(guest)
-  let release: () => void
-  try {
-    release = acquireElectronDebugger(guest).release
-  } catch {
-    // DevTools can hold the debugger; a new document resets the scale anyway.
-    return
-  }
-  guest.debugger
-    .sendCommand('Emulation.setPageScaleFactor', { pageScaleFactor: 1 })
-    .catch(() => {})
-    .finally(release)
-}
-
-function takePinch(guest: Electron.WebContents): BrowserPagePinch | undefined {
-  const pinch = pendingPinchByGuest.get(guest)
-  pendingPinchByGuest.delete(guest)
-  return guest.isDestroyed() ? undefined : pinch
 }
 
 type ViewportMetrics = {
