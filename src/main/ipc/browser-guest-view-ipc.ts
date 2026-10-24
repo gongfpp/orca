@@ -32,8 +32,6 @@ function isPagePoint(value: unknown): value is { x: number; y: number } {
   )
 }
 
-const isFiniteNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value)
 const clampFraction = (value: number): number => Math.min(1, Math.max(0, value))
 
 export function registerBrowserGuestViewHandlers(): void {
@@ -175,11 +173,11 @@ export function registerBrowserGuestViewHandlers(): void {
 
   ipcMain.on?.(
     'browser:pinchPage',
-    (event, args: { browserPageId?: unknown; deltaY?: unknown; x?: unknown; y?: unknown }) => {
+    (event, args: { browserPageId?: unknown; deltaY?: unknown }) => {
       const guest = pageGuest(event, args?.browserPageId)
-      const { deltaY, x, y } = args ?? {}
-      if (guest && isFiniteNumber(deltaY) && isFiniteNumber(x) && isFiniteNumber(y)) {
-        pinchGuestPage(guest, { deltaY, x: clampFraction(x), y: clampFraction(y) })
+      const { deltaY } = args ?? {}
+      if (guest && isPagePoint(args) && typeof deltaY === 'number' && Number.isFinite(deltaY)) {
+        pinchGuestPage(guest, { deltaY, x: clampFraction(args.x), y: clampFraction(args.y) })
       }
     }
   )

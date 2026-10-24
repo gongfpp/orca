@@ -9,9 +9,18 @@ const MAX_PINCH_SCALE = process.platform === 'darwin' ? 3 : 4
 // Why: a wheel this far outside the viewport hits no element, so only the visual viewport pans and the page sees no wheel event.
 const VIEWPORT_ONLY_WHEEL_POINT = 100_000
 
-type PinchJob = BrowserPagePinch | 'reset'
+// Why: holding the debugger for a whole gesture avoids an attach/detach per wheel event.
+const LEASE_IDLE_MS = 1_000
 
-const pendingJobsByGuest = new WeakMap<Electron.WebContents, PinchJob[]>()
+type PendingPinch = {
+  reset: boolean
+  pinch: BrowserPagePinch | null
+  running: boolean
+  release: (() => void) | null
+  idleTimer: ReturnType<typeof setTimeout> | null
+}
+
+const pendingByGuest = new WeakMap<Electron.WebContents, PendingPinch>()
 
 export function enableGuestPinchZoom(guest: Electron.WebContents): void {
   const embedder = guest.hostWebContents
@@ -26,47 +35,63 @@ export function enableGuestPinchZoom(guest: Electron.WebContents): void {
 
 // Why: Chromium hands a pinch over a <webview> to the embedder, so Orca applies it to the guest's visual viewport.
 export function pinchGuestPage(guest: Electron.WebContents, pinch: BrowserPagePinch): void {
-  const jobs = pendingJobsByGuest.get(guest) ?? []
-  const last = jobs.at(-1)
-  if (last && last !== 'reset') {
-    jobs[jobs.length - 1] = { ...pinch, deltaY: last.deltaY + pinch.deltaY }
-  } else {
-    jobs.push(pinch)
-  }
-  queueJobs(guest, jobs)
+  schedule(guest, (pending) => {
+    pending.pinch = pending.pinch
+      ? { ...pinch, deltaY: pending.pinch.deltaY + pinch.deltaY }
+      : pinch
+  })
 }
 
-// Reset zoom clears the pinch too, as Chrome does; it queues behind an in-flight pinch so it wins.
+// Reset zoom clears the pinch too, as Chrome does; it runs after an in-flight pinch so it wins.
 export function resetGuestPinchZoom(guest: Electron.WebContents): void {
-  queueJobs(guest, ['reset'])
+  schedule(guest, (pending) => {
+    pending.reset = true
+    pending.pinch = null
+  })
 }
 
-function queueJobs(guest: Electron.WebContents, jobs: PinchJob[]): void {
-  const flushing = pendingJobsByGuest.has(guest)
-  pendingJobsByGuest.set(guest, jobs)
-  if (!flushing) {
-    void flushJobs(guest, jobs)
+function schedule(guest: Electron.WebContents, update: (pending: PendingPinch) => void): void {
+  let pending = pendingByGuest.get(guest)
+  if (!pending) {
+    pending = { reset: false, pinch: null, running: false, release: null, idleTimer: null }
+    pendingByGuest.set(guest, pending)
+  }
+  update(pending)
+  if (!pending.running) {
+    void run(guest, pending)
   }
 }
 
-async function flushJobs(guest: Electron.WebContents, jobs: PinchJob[]): Promise<void> {
-  let release: (() => void) | null = null
+async function run(guest: Electron.WebContents, pending: PendingPinch): Promise<void> {
+  pending.running = true
+  if (pending.idleTimer) {
+    clearTimeout(pending.idleTimer)
+  }
   try {
-    release = acquireElectronDebugger(guest).release
-    for (let job = jobs.shift(); job; job = pendingJobsByGuest.get(guest)?.shift()) {
-      if (guest.isDestroyed()) {
-        break
+    pending.release ??= acquireElectronDebugger(guest).release
+    while (!guest.isDestroyed() && (pending.reset || pending.pinch)) {
+      if (pending.reset) {
+        pending.reset = false
+        await guest.debugger.sendCommand('Emulation.setPageScaleFactor', { pageScaleFactor: 1 })
+      } else if (pending.pinch) {
+        const pinch = pending.pinch
+        pending.pinch = null
+        await applyPinch(guest, pinch)
       }
-      await (job === 'reset'
-        ? guest.debugger.sendCommand('Emulation.setPageScaleFactor', { pageScaleFactor: 1 })
-        : applyPinch(guest, job))
     }
   } catch (error) {
     // DevTools can hold the debugger; a new document resets the scale anyway.
+    pending.reset = false
+    pending.pinch = null
+    pending.release?.()
+    pending.release = null
     console.warn('[browser-pinch-zoom] failed to zoom the page', { error: errorMessage(error) })
   } finally {
-    release?.()
-    pendingJobsByGuest.delete(guest)
+    pending.running = false
+    pending.idleTimer = setTimeout(() => {
+      pending.release?.()
+      pendingByGuest.delete(guest)
+    }, LEASE_IDLE_MS)
   }
 }
 
@@ -97,15 +122,17 @@ async function applyPinch(guest: Electron.WebContents, pinch: BrowserPagePinch):
     return
   }
   // Keep the page point under the fingers in place, within the layout viewport.
-  const pan = (fraction: number, axis: 'X' | 'Y'): number => {
-    const size = axis === 'X' ? 'clientWidth' : 'clientHeight'
-    const offset = `offset${axis}` as const
+  const pan = (
+    fraction: number,
+    offset: 'offsetX' | 'offsetY',
+    size: 'clientWidth' | 'clientHeight'
+  ): number => {
     const target = before[offset] + fraction * (before[size] - after[size])
     return Math.min(layout[size] - after[size], Math.max(0, target)) - after[offset]
   }
   const dipPerCssPixel = after.scale * (after.zoom ?? 1)
-  const panX = pan(pinch.x, 'X') * dipPerCssPixel
-  const panY = pan(pinch.y, 'Y') * dipPerCssPixel
+  const panX = pan(pinch.x, 'offsetX', 'clientWidth') * dipPerCssPixel
+  const panY = pan(pinch.y, 'offsetY', 'clientHeight') * dipPerCssPixel
   if (panX === 0 && panY === 0) {
     return
   }

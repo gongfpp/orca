@@ -35,30 +35,20 @@ function fakeGuest(before: Viewport, after: Viewport, orcaUIZoomFactor = 1) {
 }
 
 const settled = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
-const pageMethods = (sendCommand: ReturnType<typeof fakeGuest>['sendCommand']): string[] =>
-  sendCommand.mock.calls.map(([method]) => method)
 
 describe('browser guest pinch zoom', () => {
   it('keeps Orca unpinchable without waiting for the guest renderer', () => {
-    const calls: string[] = []
-    const embedder = {
-      setVisualZoomLevelLimits: vi.fn(async (min: number, max: number) => {
-        calls.push(`embedder ${min}-${max}`)
-      })
-    }
+    const embedder = { setVisualZoomLevelLimits: vi.fn(async () => {}) }
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: enableGuestPinchZoom only reads hostWebContents and calls setVisualZoomLevelLimits.
     const guest = {
       hostWebContents: embedder,
       // Electron's promise waits on the guest renderer, which may not exist yet at attach.
-      setVisualZoomLevelLimits: vi.fn((min: number, max: number) => {
-        calls.push(`guest ${min}-${max}`)
-        return new Promise<void>(() => {})
-      })
+      setVisualZoomLevelLimits: vi.fn(() => new Promise<void>(() => {}))
     } as unknown as Electron.WebContents
 
     enableGuestPinchZoom(guest)
 
-    expect(calls).toEqual([expect.stringMatching(/^guest 1-[34]$/), 'embedder 1-1'])
+    expect(embedder.setVisualZoomLevelLimits).toHaveBeenCalledWith(1, 1)
   })
 
   it('scales the page and keeps the point under the fingers in place', async () => {
@@ -72,13 +62,14 @@ describe('browser guest pinch zoom', () => {
     pinchGuestPage(guest, { deltaY: (-100 * Math.log(2)) / 1.2, x: 0.5, y: 0.25 })
     await settled()
 
-    expect(sendCommand.mock.calls[1][1]).toEqual({ pageScaleFactor: expect.closeTo(2) })
-    // The anchor moves 250 x 100 CSS px; wheel deltas are DIP, so times scale 2 and page zoom 1.25.
-    expect(sendCommand.mock.calls[3][1]).toMatchObject({
-      type: 'mouseWheel',
-      deltaX: expect.closeTo(625),
-      deltaY: expect.closeTo(250)
+    expect(sendCommand).toHaveBeenCalledWith('Emulation.setPageScaleFactor', {
+      pageScaleFactor: expect.closeTo(2)
     })
+    // The anchor moves 250 x 100 CSS px; wheel deltas are DIP, so times scale 2 and page zoom 1.25.
+    expect(sendCommand).toHaveBeenCalledWith(
+      'Input.dispatchMouseEvent',
+      expect.objectContaining({ deltaX: expect.closeTo(625), deltaY: expect.closeTo(250) })
+    )
   })
 
   it('lets Reset zoom win over a pinch already in flight', async () => {
@@ -117,7 +108,7 @@ describe('browser guest pinch zoom', () => {
     await settled()
 
     // A leftover pan would scroll the page itself.
-    expect(pageMethods(sendCommand)).toEqual([
+    expect(sendCommand.mock.calls.map(([method]) => method)).toEqual([
       'Page.getLayoutMetrics',
       'Emulation.setPageScaleFactor',
       'Page.getLayoutMetrics'

@@ -38,12 +38,22 @@ describe('browserManager grab operations', () => {
 
   describe('captureSelectionScreenshot', () => {
     it.each([
-      ['an unzoomed page', { width: 1000, scale: 1, left: 0, top: 0 }, { x: 10, y: 20 }, 2],
+      [
+        'an unzoomed page',
+        { width: 1000, scale: 1, left: 0, top: 0 },
+        { x: 10, y: 20 },
+        { x: 20, y: 40, width: 200, height: 100 }
+      ],
       // A trackpad pinch scales and offsets the visual viewport the capture shows.
-      ['a pinch-zoomed page', { width: 1000, scale: 2, left: 100, top: 50 }, { x: 105, y: 60 }, 4]
+      [
+        'a pinch-zoomed page',
+        { width: 1000, scale: 2, left: 100, top: 50 },
+        { x: 105, y: 60 },
+        { x: 20, y: 40, width: 400, height: 200 }
+      ]
     ])(
       'captures, crops, and converts screenshot dimensions back to CSS pixels on %s',
-      async (_case, viewport, origin, bitmapPerCssPixel) => {
+      async (_case, viewport, origin, crop) => {
         const cropMock = vi.fn(() => ({
           toPNG: vi.fn(() => Buffer.from('png-data'))
         }))
@@ -62,12 +72,7 @@ describe('browserManager grab operations', () => {
           guest
         )
 
-        expect(cropMock).toHaveBeenCalledWith({
-          x: (origin.x - viewport.left) * bitmapPerCssPixel,
-          y: (origin.y - viewport.top) * bitmapPerCssPixel,
-          width: 100 * bitmapPerCssPixel,
-          height: 50 * bitmapPerCssPixel
-        })
+        expect(cropMock).toHaveBeenCalledWith(crop)
         expect(screenshot).toEqual({
           mimeType: 'image/png',
           dataUrl: `data:image/png;base64,${Buffer.from('png-data').toString('base64')}`,
