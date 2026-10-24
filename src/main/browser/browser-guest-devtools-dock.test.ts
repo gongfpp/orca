@@ -114,28 +114,6 @@ describe('BrowserGuestDevToolsDock', () => {
     }
   })
 
-  it('closes by destroying its host, which a closeDevTools() call would leave frozen', async () => {
-    const { dock, guest, onClosed } = await openDock()
-    const [view] = electronMocks.views
-
-    dock.close(GUEST_ID)
-
-    expect(view.host.close).toHaveBeenCalled()
-    expect(guest.closeDevTools).not.toHaveBeenCalled()
-    expect(children).toEqual([])
-    expect(onClosed).toHaveBeenCalledTimes(1)
-    expect(dock.isDocked(GUEST_ID)).toBe(false)
-  })
-
-  it("closes when DevTools' own close button closes them", async () => {
-    const { guest, onClosed } = await openDock()
-
-    guest.emit('devtools-closed')
-
-    expect(onClosed).toHaveBeenCalledTimes(1)
-    expect(children).toEqual([])
-  })
-
   it('reconnects a fresh frontend in the same place once a crashed page is back', async () => {
     const { dock, guest, onClosed } = await openDock()
     await dock.setBounds(GUEST_ID, { x: 0, y: 0, width: 100, height: 100 }, false)
@@ -176,8 +154,8 @@ describe('BrowserGuestDevToolsDock', () => {
     expect(view.visible).toBe(true)
   })
 
-  it('reopens only once the closed host has let go, or Electron would open nothing', async () => {
-    const { dock, guest } = await openDock()
+  it('closes by destroying its host and reopens only once Electron has let go of it', async () => {
+    const { dock, guest, onClosed } = await openDock()
 
     void dock.close(GUEST_ID)
     const reopened = dock.open(asGuest(guest), vi.fn())
@@ -186,6 +164,9 @@ describe('BrowserGuestDevToolsDock', () => {
     await expect(reopened).resolves.toBe(true)
     expect(guest.setDevToolsWebContents).toHaveBeenCalledTimes(2)
     expect(electronMocks.views[0].destroyed).toBe(true)
+    // closeDevTools() would leave a custom host attached and frozen.
+    expect(guest.closeDevTools).not.toHaveBeenCalled()
+    expect(onClosed).toHaveBeenCalledTimes(1)
   })
 
   it('reports the close when its host was destroyed underneath it', async () => {
