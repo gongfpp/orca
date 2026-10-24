@@ -23,8 +23,11 @@ export abstract class BrowserManagerViewport extends BrowserManagerDownloadLifec
     if (!guest) {
       return false
     }
-    if (options?.detach || !this.openDockedDevTools(browserTabId, guest)) {
-      this.devToolsDock.close(guest.id)
+    if (options?.detach || !(await this.openDockedDevTools(browserTabId, guest))) {
+      await this.devToolsDock.close(guest.id)
+      if (guest.isDestroyed()) {
+        return false
+      }
       guest.openDevTools({ mode: 'detach' })
     }
     if (inspectAt) {
@@ -86,7 +89,10 @@ export abstract class BrowserManagerViewport extends BrowserManagerDownloadLifec
     return this.offscreenGuestIds.has(webContentsId) ? null : guest
   }
 
-  private openDockedDevTools(browserTabId: string, guest: Electron.WebContents): boolean {
+  private async openDockedDevTools(
+    browserTabId: string,
+    guest: Electron.WebContents
+  ): Promise<boolean> {
     const renderer = resolveRendererWebContents(this.rendererWebContentsIdByTabId, browserTabId)
     if (!renderer) {
       return false
@@ -96,7 +102,7 @@ export abstract class BrowserManagerViewport extends BrowserManagerDownloadLifec
         renderer.send('browser:devToolsDockChanged', { browserPageId: browserTabId, docked })
       }
     }
-    if (!this.devToolsDock.open(guest, () => notify(false))) {
+    if (!(await this.devToolsDock.open(guest, () => notify(false)))) {
       return false
     }
     notify(true)

@@ -9,14 +9,23 @@ const electronMocks = vi.hoisted(() => {
     visible = true
     onDestroyed: (() => void) | null = null
     destroyed = false
-    webContents = {
+    host = {
+      // Like Electron, destruction finishes after close() returns.
       close: vi.fn(() => {
-        this.destroyed = true
-        this.onDestroyed?.()
+        setImmediate(() => this.destroy())
       }),
       isDestroyed: () => this.destroyed,
+      once: vi.fn(),
       focus: vi.fn(),
       capturePage: vi.fn()
+    }
+    // Electron drops a view's contents once they are destroyed.
+    get webContents(): typeof this.host | null {
+      return this.destroyed ? null : this.host
+    }
+    destroy(): void {
+      this.destroyed = true
+      this.onDestroyed?.()
     }
     constructor() {
       electronMocks.views.push(this)
@@ -61,11 +70,12 @@ function createGuest(): EventEmitter & {
     id: GUEST_ID,
     hostWebContents: {},
     isDevToolsOpened: () => false,
+    isDestroyed: () => false,
     closeDevTools: vi.fn(),
     openDevTools: vi.fn(),
     setDevToolsWebContents: vi.fn((devTools: unknown) => {
       // Electron reports a destroyed custom host as DevTools closing on the inspected page.
-      const view = electronMocks.views.find((v) => v.webContents === devTools)
+      const view = electronMocks.views.find((v) => v.host === devTools)
       if (view) {
         view.onDestroyed = () => guest.emit('devtools-closed')
       }
@@ -74,11 +84,17 @@ function createGuest(): EventEmitter & {
   return guest
 }
 
-function openDock(onClosed = vi.fn()) {
+const tick = (): Promise<void> => new Promise((resolve) => setImmediate(resolve))
+
+function asGuest(guest: ReturnType<typeof createGuest>): Electron.WebContents {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fake implements every guest member the dock calls.
+  return guest as unknown as Electron.WebContents
+}
+
+async function openDock(onClosed = vi.fn()) {
   const dock = new BrowserGuestDevToolsDock()
   const guest = createGuest()
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fake implements every guest member the dock calls.
-  dock.open(guest as unknown as Electron.WebContents, onClosed)
+  await dock.open(asGuest(guest), onClosed)
   return { dock, guest, onClosed }
 }
 
@@ -98,21 +114,21 @@ describe('BrowserGuestDevToolsDock', () => {
     }
   })
 
-  it('closes by destroying its host, which a closeDevTools() call would leave frozen', () => {
-    const { dock, guest, onClosed } = openDock()
+  it('closes by destroying its host, which a closeDevTools() call would leave frozen', async () => {
+    const { dock, guest, onClosed } = await openDock()
     const [view] = electronMocks.views
 
     dock.close(GUEST_ID)
 
-    expect(view.webContents.close).toHaveBeenCalled()
+    expect(view.host.close).toHaveBeenCalled()
     expect(guest.closeDevTools).not.toHaveBeenCalled()
     expect(children).toEqual([])
     expect(onClosed).toHaveBeenCalledTimes(1)
     expect(dock.isDocked(GUEST_ID)).toBe(false)
   })
 
-  it("closes when DevTools' own close button closes them", () => {
-    const { guest, onClosed } = openDock()
+  it("closes when DevTools' own close button closes them", async () => {
+    const { guest, onClosed } = await openDock()
 
     guest.emit('devtools-closed')
 
@@ -121,16 +137,17 @@ describe('BrowserGuestDevToolsDock', () => {
   })
 
   it('reconnects a fresh frontend in the same place once a crashed page is back', async () => {
-    const { dock, guest, onClosed } = openDock()
+    const { dock, guest, onClosed } = await openDock()
     await dock.setBounds(GUEST_ID, { x: 10, y: 20, width: 300, height: 200 }, false)
     const [stale] = electronMocks.views
 
     guest.emit('render-process-gone')
     guest.emit('dom-ready')
+    await tick()
 
     const fresh = electronMocks.views[1]
-    expect(stale.webContents.close).toHaveBeenCalled()
-    expect(guest.setDevToolsWebContents).toHaveBeenLastCalledWith(fresh.webContents)
+    expect(stale.destroyed).toBe(true)
+    expect(guest.setDevToolsWebContents).toHaveBeenLastCalledWith(fresh.host)
     expect(fresh.bounds).toEqual({ x: 10, y: 20, width: 300, height: 200 })
     expect(fresh.visible).toBe(true)
     expect(children).toEqual([fresh])
@@ -139,11 +156,11 @@ describe('BrowserGuestDevToolsDock', () => {
   })
 
   it('keeps a view shown again while the snapshot for an overlay was still capturing', async () => {
-    const { dock } = openDock()
+    const { dock } = await openDock()
     await dock.setBounds(GUEST_ID, { x: 0, y: 0, width: 100, height: 100 }, false)
     const [view] = electronMocks.views
     let finishCapture: (image: unknown) => void = () => {}
-    view.webContents.capturePage.mockReturnValue(
+    view.host.capturePage.mockReturnValue(
       new Promise((resolve) => {
         finishCapture = resolve
       })
@@ -155,5 +172,26 @@ describe('BrowserGuestDevToolsDock', () => {
 
     await expect(hidden).resolves.toBe('data:image/png;base64,')
     expect(view.visible).toBe(true)
+  })
+
+  it('reopens only once the closed host has let go, or Electron would open nothing', async () => {
+    const { dock, guest } = await openDock()
+
+    void dock.close(GUEST_ID)
+    const reopened = dock.open(asGuest(guest), vi.fn())
+    expect(guest.setDevToolsWebContents).toHaveBeenCalledTimes(1)
+
+    await expect(reopened).resolves.toBe(true)
+    expect(guest.setDevToolsWebContents).toHaveBeenCalledTimes(2)
+    expect(electronMocks.views[0].destroyed).toBe(true)
+  })
+
+  it('reports the close when its host was destroyed underneath it', async () => {
+    const { dock, onClosed } = await openDock()
+
+    electronMocks.views[0].destroy()
+
+    expect(onClosed).toHaveBeenCalledTimes(1)
+    expect(dock.isDocked(GUEST_ID)).toBe(false)
   })
 })

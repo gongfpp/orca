@@ -2,6 +2,7 @@ import { BrowserWindow, WebContentsView } from 'electron'
 import type { BrowserDevToolsDockBounds } from '../../shared/browser-devtools-dock'
 
 type DockedDevTools = {
+  guest: Electron.WebContents
   /** Replaced after a page crash; the entry itself lives until DevTools close. */
   view: WebContentsView
   window: BrowserWindow
@@ -16,16 +17,22 @@ type DockedDevTools = {
  *  WebContentsView laid over the pane's DevTools slot; the renderer owns the slot's layout. */
 export class BrowserGuestDevToolsDock {
   private readonly docks = new Map<number, DockedDevTools>()
+  /** Hosts still detaching: Electron opens nothing for a guest until its old frontend lets go. */
+  private readonly releases = new Map<number, Promise<void>>()
 
   isDocked(guestId: number): boolean {
     return this.docks.has(guestId)
   }
 
   /** Returns false when the guest has no window to dock into. `onClosed` runs however it closes. */
-  open(guest: Electron.WebContents, onClosed: () => void): boolean {
+  async open(guest: Electron.WebContents, onClosed: () => void): Promise<boolean> {
+    await this.releases.get(guest.id)
+    if (guest.isDestroyed()) {
+      return false
+    }
     const existing = this.docks.get(guest.id)
     if (existing) {
-      existing.view.webContents.focus()
+      existing.view.webContents?.focus()
       return true
     }
     const host = guest.hostWebContents
@@ -62,12 +69,13 @@ export class BrowserGuestDevToolsDock {
         reconnecting = null
         return
       }
-      this.close(guest.id)
+      void this.close(guest.id)
     }
     guest.on('render-process-gone', handleCrash)
     guest.on('dom-ready', handleDomReady)
     guest.on('devtools-closed', handleClosed)
     this.docks.set(guest.id, {
+      guest,
       view: attachDevToolsView(guest, window),
       window,
       dispose: () => {
@@ -108,24 +116,57 @@ export class BrowserGuestDevToolsDock {
       dock.view.setVisible(true)
       return null
     }
-    const image =
-      snapshot && dock.view.getVisible() ? await dock.view.webContents.capturePage() : null
+    const host = dock.view.webContents
+    const image = snapshot && host && dock.view.getVisible() ? await host.capturePage() : null
     if (dock.boundsGeneration === generation) {
       dock.view.setVisible(false)
     }
     return image && !image.isEmpty() ? image.toDataURL() : null
   }
 
-  close(guestId: number): void {
+  /** Resolves once Electron has let go of the host, so DevTools can open again. */
+  close(guestId: number): Promise<void> {
     const dock = this.docks.get(guestId)
     if (!dock) {
-      return
+      return this.releases.get(guestId) ?? Promise.resolve()
     }
     this.docks.delete(guestId)
     dock.dispose()
+    const released = waitForRelease(dock.guest, dock.view)
+    this.releases.set(guestId, released)
+    void released.then(() => {
+      if (this.releases.get(guestId) === released) {
+        this.releases.delete(guestId)
+      }
+    })
     destroyView(dock.window, dock.view)
     dock.onClosed()
+    return released
   }
+}
+
+// Electron detaches the frontend when its host is destroyed and reports it as devtools-closed.
+function waitForRelease(guest: Electron.WebContents, view: WebContentsView): Promise<void> {
+  const host = view.webContents
+  if (!host || host.isDestroyed() || guest.isDestroyed()) {
+    return Promise.resolve()
+  }
+  return new Promise((resolve) => {
+    const done = (): void => {
+      try {
+        guest.off('devtools-closed', done)
+        guest.off('destroyed', done)
+      } catch {
+        // guest may already be destroyed
+      }
+      // Let the rest of the host's destruction run before anyone reopens.
+      setImmediate(resolve)
+    }
+    guest.once('devtools-closed', done)
+    guest.once('destroyed', done)
+    // A frontend that closed itself already reported devtools-closed; its host may not again.
+    host.once('destroyed', done)
+  })
 }
 
 // Each open needs a fresh host: Electron loads the frontend only into one that never navigated.
@@ -144,7 +185,9 @@ function destroyView(window: BrowserWindow, view: WebContentsView): void {
     window.contentView.removeChildView(view)
   }
   // closeDevTools() leaves a custom host attached and frozen; destroying the host detaches it.
-  if (!view.webContents.isDestroyed()) {
-    view.webContents.close()
+  // Electron drops webContents from a view whose contents are already gone.
+  const host = view.webContents
+  if (host && !host.isDestroyed()) {
+    host.close()
   }
 }

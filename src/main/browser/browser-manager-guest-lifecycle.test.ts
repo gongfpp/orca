@@ -17,7 +17,16 @@ const browserMocks = vi.hoisted(() => ({
 
 vi.mock('electron', () => ({
   WebContentsView: class {
-    webContents = { id: 9001, isDestroyed: () => false, close: vi.fn(), focus: vi.fn() }
+    onDestroyed: (() => void) | null = null
+    webContents = {
+      id: 9001,
+      isDestroyed: () => false,
+      close: () => this.onDestroyed?.(),
+      once: (_event: string, listener: () => void) => {
+        this.onDestroyed = listener
+      },
+      focus: vi.fn()
+    }
     setVisible(): void {}
   },
   app: {
@@ -208,6 +217,7 @@ describe('browserManager', () => {
       setWindowOpenHandler: guestSetWindowOpenHandlerMock,
       setDevToolsWebContents,
       on: guestOnMock,
+      once: vi.fn(),
       off: guestOffMock,
       openDevTools: guestOpenDevToolsMock
     }
