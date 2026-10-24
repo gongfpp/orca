@@ -170,9 +170,9 @@ describe('BrowserGuestDevToolsDock', () => {
 
     const hidden = dock.setBounds(GUEST_ID, null, true)
     await dock.setBounds(GUEST_ID, { x: 0, y: 0, width: 120, height: 100 }, false)
-    finishCapture({ isEmpty: () => false, toDataURL: () => 'data:image/png;base64,' })
+    finishCapture({ isEmpty: () => false, toJPEG: () => Buffer.from('') })
 
-    await expect(hidden).resolves.toBe('data:image/png;base64,')
+    await expect(hidden).resolves.toBe('data:image/jpeg;base64,')
     expect(view.visible).toBe(true)
   })
 

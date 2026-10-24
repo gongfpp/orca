@@ -100,17 +100,6 @@ export function createBrowserApi(): NonNullable<Partial<PreloadApi>['browser']> 
   } as unknown as NonNullable<Partial<PreloadApi>['browser']>
 }
 
-/** A web client hosts no page guests, so its DevTools never dock. Typed apart from the cast
- *  above so the compiler checks these against the preload API. */
-export const WEB_BROWSER_DEVTOOLS_DOCK_API: Pick<
-  PreloadApi['browser'],
-  'closeDevTools' | 'setDevToolsDockBounds' | 'onDevToolsDockChanged'
-> = {
-  closeDevTools: () => Promise.resolve(),
-  setDevToolsDockBounds: () => Promise.resolve(null),
-  onDevToolsDockChanged: () => noopUnsubscribe
-}
-
 export function createEmulatorApi(): NonNullable<Partial<PreloadApi>['emulator']> {
   return {
     onPaneFocus: () => noopUnsubscribe,

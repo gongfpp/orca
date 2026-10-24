@@ -10,7 +10,7 @@ import {
 import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
 import { isTrustedBrowserRenderer } from './browser-renderer-trust'
 import type { BrowserViewportOverride } from '../../shared/browser-workspace-types'
-import type { BrowserDevToolsDockBounds } from '../../shared/browser-devtools-dock'
+import { isValidBrowserGrabRect } from '../../shared/browser-annotation-viewport-report'
 import {
   isBrowserSiteColorScheme,
   type BrowserPageSiteDisplay
@@ -29,18 +29,6 @@ function isPagePoint(value: unknown): value is { x: number; y: number } {
     'y' in value &&
     Number.isFinite(value.x) &&
     Number.isFinite(value.y)
-  )
-}
-
-function isDockBounds(value: unknown): value is BrowserDevToolsDockBounds {
-  return (
-    isPagePoint(value) &&
-    'width' in value &&
-    'height' in value &&
-    Number.isFinite(value.width) &&
-    Number.isFinite(value.height) &&
-    Number(value.width) >= 0 &&
-    Number(value.height) >= 0
   )
 }
 
@@ -141,7 +129,7 @@ export function registerBrowserGuestViewHandlers(): void {
       }
       return browserManager.setDevToolsDockBounds(
         args.browserPageId,
-        isDockBounds(args.bounds) ? args.bounds : null,
+        isValidBrowserGrabRect(args.bounds) ? args.bounds : null,
         args.snapshot === true
       )
     }

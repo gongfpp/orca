@@ -67,6 +67,7 @@ export function BrowserDevToolsDock({
     releaseDragRef.current = null
   }, [])
   const nextSide = layout.side === 'bottom' ? 'right' : 'bottom'
+  const title = translate('auto.components.browser.pane.BrowserPane.devToolsTitle', 'DevTools')
 
   return (
     <>
@@ -78,14 +79,12 @@ export function BrowserDevToolsDock({
       />
       <section
         data-browser-devtools-dock={layout.side}
-        aria-label={translate('auto.components.browser.pane.BrowserPane.devToolsTitle', 'DevTools')}
+        aria-label={title}
         className="flex min-h-0 min-w-0 flex-col bg-background"
         style={{ flex: `${browserDevToolsDockFraction(layout)} 1 0%` }}
       >
         <div className="flex h-7 shrink-0 items-center gap-0.5 border-b border-border px-2">
-          <span className="mr-auto truncate text-xs text-muted-foreground">
-            {translate('auto.components.browser.pane.BrowserPane.devToolsTitle', 'DevTools')}
-          </span>
+          <span className="mr-auto truncate text-xs text-muted-foreground">{title}</span>
           <DockAction
             label={
               nextSide === 'right'

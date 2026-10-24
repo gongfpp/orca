@@ -6,8 +6,8 @@ type DockedDevTools = {
   /** Replaced after a page crash; the entry itself lives until DevTools close. */
   view: WebContentsView
   window: BrowserWindow
+  /** Drops the guest listeners and reports the close. */
   dispose: () => void
-  onClosed: () => void
   /** Bumped by every bounds update, so a slow snapshot can't hide a view shown after it. */
   boundsGeneration: number
 }
@@ -44,26 +44,24 @@ export class BrowserGuestDevToolsDock {
       // Electron ignores a custom host while its own DevTools window exists.
       guest.closeDevTools()
     }
-    let crashed = false
-    let reconnecting = false
+    let phase: 'live' | 'crashed' | 'reconnecting' = 'live'
     const handleCrash = (): void => {
-      crashed = true
+      phase = 'crashed'
     }
     // A crash leaves the frontend detached for good. Once the page is back, drop the stale host;
     // its devtools-closed then brings up a fresh one in the same place, like Chrome reconnecting.
     const handleDomReady = (): void => {
       const dock = this.docks.get(guest.id)
-      if (crashed && dock && !reconnecting) {
-        crashed = false
-        reconnecting = true
+      if (phase === 'crashed' && dock) {
+        phase = 'reconnecting'
         destroyView(window, dock.view)
       }
     }
     // Fires for DevTools' own close button and for the host being destroyed.
     const handleClosed = (): void => {
       const dock = this.docks.get(guest.id)
-      if (dock && reconnecting) {
-        reconnecting = false
+      if (dock && phase === 'reconnecting') {
+        phase = 'live'
         // The stale view kept taking bounds while it detached, so it holds the latest ones.
         const stale = dock.view
         dock.view = attachDevToolsView(guest, window)
@@ -88,8 +86,8 @@ export class BrowserGuestDevToolsDock {
         } catch {
           // guest may already be destroyed
         }
+        onClosed()
       },
-      onClosed,
       boundsGeneration: 0
     })
     return true
@@ -123,7 +121,10 @@ export class BrowserGuestDevToolsDock {
     if (dock.boundsGeneration === generation) {
       dock.view.setVisible(false)
     }
-    return image && !image.isEmpty() ? image.toDataURL() : null
+    // JPEG: it only shows under a backdrop or a drag, and encodes far faster than PNG.
+    return image && !image.isEmpty()
+      ? `data:image/jpeg;base64,${image.toJPEG(85).toString('base64')}`
+      : null
   }
 
   /** Resolves once Electron has let go of the host, so DevTools can open again. */
@@ -142,7 +143,6 @@ export class BrowserGuestDevToolsDock {
       }
     })
     destroyView(dock.window, dock.view)
-    dock.onClosed()
     return released
   }
 }

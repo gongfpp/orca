@@ -3,11 +3,11 @@ import { hasVisibleOverlayOver } from '@/lib/visible-overlay'
 import { registerBrowserClientPagePositionSync } from '../browser-client-page-position-driver'
 import { isWebviewDragPassthroughActive } from '../host-guest/webview-drag-passthrough'
 
+export type BrowserDevToolsDockSnapshot = { url: string; width: number; height: number }
+
 /** Keeps docked DevTools, a native view painted above all HTML, over `placeholder`. While Orca
  *  UI is drawn over that area or a drag needs the pointer, the view hides and its last frame is
  *  returned for the placeholder to paint instead. */
-export type BrowserDevToolsDockSnapshot = { url: string; width: number; height: number }
-
 export function useBrowserDevToolsDockBounds(
   browserPageId: string,
   placeholder: HTMLElement | null
@@ -37,9 +37,9 @@ export function useBrowserDevToolsDockBounds(
         return
       }
       applied = next
-      if (next === 'hidden' || next === 'covered') {
+      if (!visible || covered) {
         void window.api.browser
-          .setDevToolsDockBounds({ browserPageId, bounds: null, snapshot: next === 'covered' })
+          .setDevToolsDockBounds({ browserPageId, bounds: null, snapshot: covered })
           .then((url) => {
             if (url && applied === 'covered') {
               setSnapshot({ url, width: rect.width, height: rect.height })

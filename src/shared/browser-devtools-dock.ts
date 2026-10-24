@@ -1,8 +1,6 @@
-export type BrowserDevToolsDockSide = 'bottom' | 'right'
-
 /** Where docked DevTools sit and how much of the pane they take, per side. */
 export type BrowserDevToolsDockLayout = {
-  side: BrowserDevToolsDockSide
+  side: 'bottom' | 'right'
   bottomFraction: number
   rightFraction: number
 }
@@ -20,15 +18,13 @@ export function browserDevToolsDockFraction(layout: BrowserDevToolsDockLayout): 
   return layout.side === 'bottom' ? layout.bottomFraction : layout.rightFraction
 }
 
-export const MIN_BROWSER_DEVTOOLS_DOCK_FRACTION = 0.15
-export const MAX_BROWSER_DEVTOOLS_DOCK_FRACTION = 0.85
+// The divider's own drag limits (TabGroupSplitNodeTree's ResizeHandle); this guards saved values.
+const MIN_FRACTION = 0.15
+const MAX_FRACTION = 0.85
 
-export function clampBrowserDevToolsDockFraction(value: unknown, fallback: number): number {
+function clampFraction(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value)
-    ? Math.min(
-        MAX_BROWSER_DEVTOOLS_DOCK_FRACTION,
-        Math.max(MIN_BROWSER_DEVTOOLS_DOCK_FRACTION, value)
-      )
+    ? Math.min(MAX_FRACTION, Math.max(MIN_FRACTION, value))
     : fallback
 }
 
@@ -39,11 +35,11 @@ export function normalizeBrowserDevToolsDockLayout(value: unknown): BrowserDevTo
   }
   return {
     side: 'side' in value && value.side === 'right' ? 'right' : 'bottom',
-    bottomFraction: clampBrowserDevToolsDockFraction(
+    bottomFraction: clampFraction(
       'bottomFraction' in value ? value.bottomFraction : undefined,
       defaults.bottomFraction
     ),
-    rightFraction: clampBrowserDevToolsDockFraction(
+    rightFraction: clampFraction(
       'rightFraction' in value ? value.rightFraction : undefined,
       defaults.rightFraction
     )

@@ -7,7 +7,6 @@ import {
 import type { BrowserViewportOverride } from '../../shared/browser-workspace-types'
 import { BrowserManagerDownloadLifecycle } from './browser-manager-download-lifecycle'
 import { sendGuestCdpCommand } from './guest-cdp-command'
-import { resolveRendererWebContents } from './browser-guest-renderer-target'
 import type { BrowserDevToolsDockBounds } from '../../shared/browser-devtools-dock'
 
 // Omit maxTouchPoints when disabling: Chromium rejects 0 even then (#22749).
@@ -93,7 +92,7 @@ export abstract class BrowserManagerViewport extends BrowserManagerDownloadLifec
     browserTabId: string,
     guest: Electron.WebContents
   ): Promise<boolean> {
-    const renderer = resolveRendererWebContents(this.rendererWebContentsIdByTabId, browserTabId)
+    const renderer = this.resolveRendererForBrowserTab(browserTabId)
     if (!renderer) {
       return false
     }
