@@ -11,7 +11,7 @@ type Viewport = {
 }
 
 // Metrics before and after Emulation.setPageScaleFactor, as Blink reports them.
-function fakeGuest(before: Viewport, after: Viewport) {
+function fakeGuest(before: Viewport, after: Viewport, orcaUIZoomFactor = 1) {
   const visualViewports = [before, after]
   const sendCommand = vi.fn(async (method: string, _params?: object) =>
     method === 'Page.getLayoutMetrics'
@@ -21,9 +21,10 @@ function fakeGuest(before: Viewport, after: Viewport) {
         }
       : {}
   )
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the lease and pinch code only call isDestroyed, debugger.isAttached and debugger.sendCommand.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the lease and pinch code only call isDestroyed, hostWebContents.getZoomFactor, debugger.isAttached and debugger.sendCommand.
   const guest = {
     isDestroyed: () => false,
+    hostWebContents: { getZoomFactor: () => orcaUIZoomFactor },
     debugger: { isAttached: () => true, sendCommand }
   } as unknown as Electron.WebContents
   return { guest, sendCommand }
@@ -59,10 +60,12 @@ describe('browser guest pinch zoom', () => {
   it('scales the page and keeps the point under the fingers in place', async () => {
     const { guest, sendCommand } = fakeGuest(
       { offsetX: 0, offsetY: 0, clientWidth: 1000, clientHeight: 800, scale: 1, zoom: 1.25 },
-      { offsetX: 0, offsetY: 0, clientWidth: 500, clientHeight: 400, scale: 2, zoom: 1.25 }
+      { offsetX: 0, offsetY: 0, clientWidth: 500, clientHeight: 400, scale: 2, zoom: 1.25 },
+      1.2
     )
 
-    pinchGuestPage(guest, { deltaY: -100 * Math.log(2), x: 0.5, y: 0.25 })
+    // At 120% Orca UI zoom the DOM reports the 2x pinch's wheel delta divided by 1.2.
+    pinchGuestPage(guest, { deltaY: (-100 * Math.log(2)) / 1.2, x: 0.5, y: 0.25 })
     await settled()
 
     expect(sendCommand.mock.calls[1][1]).toEqual({ pageScaleFactor: expect.closeTo(2) })

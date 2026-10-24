@@ -13,6 +13,7 @@ import {
 } from '../../shared/browser-page-zoom'
 import type { PersistedUIState } from '../../shared/persisted-ui-state-types'
 import { errorMessage } from '../../shared/error-message'
+import { resetGuestPinchZoom } from './browser-guest-pinch-zoom'
 
 type TrackedGuest = {
   guest: Electron.WebContents
@@ -105,8 +106,12 @@ export class BrowserSiteDisplayController {
   }
 
   zoomPage(guestId: number, direction: BrowserPageZoomDirection): BrowserPageSiteDisplay | null {
+    const tracked = this.guests.get(guestId)
+    if (direction === 'reset' && tracked) {
+      resetGuestPinchZoom(tracked.guest)
+    }
     const display = this.getPageDisplay(guestId)
-    const profileId = this.guests.get(guestId)?.profileId
+    const profileId = tracked?.profileId
     if (!display?.site || !profileId) {
       return display
     }

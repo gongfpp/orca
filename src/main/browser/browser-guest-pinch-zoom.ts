@@ -49,6 +49,22 @@ async function flushPinches(guest: Electron.WebContents): Promise<void> {
   }
 }
 
+// Reset zoom clears the pinch too, as Chrome does.
+export function resetGuestPinchZoom(guest: Electron.WebContents): void {
+  pendingPinchByGuest.delete(guest)
+  let release: () => void
+  try {
+    release = acquireElectronDebugger(guest).release
+  } catch {
+    // DevTools can hold the debugger; a new document resets the scale anyway.
+    return
+  }
+  guest.debugger
+    .sendCommand('Emulation.setPageScaleFactor', { pageScaleFactor: 1 })
+    .catch(() => {})
+    .finally(release)
+}
+
 function takePinch(guest: Electron.WebContents): BrowserPagePinch | undefined {
   const pinch = pendingPinchByGuest.get(guest)
   pendingPinchByGuest.delete(guest)
@@ -71,9 +87,11 @@ async function applyPinch(guest: Electron.WebContents, pinch: BrowserPagePinch):
   const readMetrics = (): Promise<ViewportMetrics> =>
     guest.debugger.sendCommand('Page.getLayoutMetrics')
   const { cssVisualViewport: before } = await readMetrics()
-  // Chromium's pinch wheel carries deltaY = -100 * ln(scale change); Blink clamps to the page's limits.
+  // Chromium's pinch wheel carries deltaY = -100 * ln(scale change) in DIP; the DOM divided it by Orca's UI zoom.
+  const deltaY = pinch.deltaY * (guest.hostWebContents?.getZoomFactor() ?? 1)
+  // Blink clamps to the page's limits.
   await guest.debugger.sendCommand('Emulation.setPageScaleFactor', {
-    pageScaleFactor: before.scale * Math.exp(-pinch.deltaY / 100)
+    pageScaleFactor: before.scale * Math.exp(-deltaY / 100)
   })
   const { cssLayoutViewport: layout, cssVisualViewport: after } = await readMetrics()
   if (after.scale === before.scale) {
@@ -87,16 +105,16 @@ async function applyPinch(guest: Electron.WebContents, pinch: BrowserPagePinch):
     return Math.min(layout[size] - after[size], Math.max(0, target)) - after[offset]
   }
   const dipPerCssPixel = after.scale * (after.zoom ?? 1)
-  const deltaX = pan(pinch.x, 'X') * dipPerCssPixel
-  const deltaY = pan(pinch.y, 'Y') * dipPerCssPixel
-  if (deltaX === 0 && deltaY === 0) {
+  const panX = pan(pinch.x, 'X') * dipPerCssPixel
+  const panY = pan(pinch.y, 'Y') * dipPerCssPixel
+  if (panX === 0 && panY === 0) {
     return
   }
   await guest.debugger.sendCommand('Input.dispatchMouseEvent', {
     type: 'mouseWheel',
     x: VIEWPORT_ONLY_WHEEL_POINT,
     y: VIEWPORT_ONLY_WHEEL_POINT,
-    deltaX,
-    deltaY
+    deltaX: panX,
+    deltaY: panY
   })
 }

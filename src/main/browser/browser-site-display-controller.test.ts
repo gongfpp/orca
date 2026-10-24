@@ -12,7 +12,7 @@ import { BrowserSiteDisplayController } from './browser-site-display-controller'
 import { configureBrowserSiteDisplayStore } from './browser-site-display-store'
 
 type FakeGuest = Electron.WebContents &
-  EventEmitter & { url: string; level: number; mediaSent: unknown[] }
+  EventEmitter & { url: string; level: number; mediaSent: unknown[]; pageScales: unknown[] }
 
 let nextGuestId = 1
 
@@ -26,6 +26,7 @@ function fakeGuest(url: string): FakeGuest {
     url,
     level: 0,
     mediaSent: [],
+    pageScales: [],
     isDestroyed: () => false,
     getURL: () => guest.url,
     getZoomLevel: () => guest.level,
@@ -41,9 +42,15 @@ function fakeGuest(url: string): FakeGuest {
         attached = false
         debuggerEvents.emit('detach')
       },
-      sendCommand: (method: string, params: { features: { value: string }[] }) => {
+      sendCommand: (
+        method: string,
+        params: { features: { value: string }[]; pageScaleFactor: number }
+      ) => {
         if (method === 'Emulation.setEmulatedMedia') {
           guest.mediaSent.push(params.features[0].value)
+        }
+        if (method === 'Emulation.setPageScaleFactor') {
+          guest.pageScales.push(params.pageScaleFactor)
         }
         return Promise.resolve({})
       }
@@ -105,8 +112,11 @@ describe('BrowserSiteDisplayController zoom', () => {
     commit(controller, docs, 'https://github.com/d')
     expect(percent(docs)).toBe(125)
 
+    expect(github.pageScales).toEqual([])
     expect(controller.zoomPage(github.id, 'reset')).toMatchObject({ siteHasZoom: false })
     expect([github, githubOtherPort, docs].map(percent)).toEqual([110, 110, 110])
+    // Reset also undoes a trackpad pinch, as Chrome does.
+    expect(github.pageScales).toEqual([1])
   })
 
   it("restores the site's zoom after Orca's UI zoom is copied onto the page", () => {
