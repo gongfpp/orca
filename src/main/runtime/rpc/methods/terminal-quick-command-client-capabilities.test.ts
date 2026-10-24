@@ -1,13 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import { getDefaultPersistedState } from '../../../../shared/constants'
+import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../../../shared/electron-remote-runtime-client-capabilities'
+import { remoteRuntimeClientCapabilities } from '../../../../shared/remote-runtime-client-capabilities'
 import { LEGACY_MAX_QUICK_COMMAND_AGENT_PROMPT_LENGTH } from '../../../../shared/terminal-quick-command-prompt-limit'
 import type { TerminalQuickCommand } from '../../../../shared/terminal-quick-command-types'
 import type { TerminalQuickCommandMutation } from '../../../../shared/terminal-quick-commands'
+import { WEB_RUNTIME_CLIENT_CAPABILITIES } from '../../../../shared/web-runtime-client-capabilities'
 import {
   TERMINAL_QUICK_COMMAND_LARGE_LISTS_RUNTIME_CAPABILITY,
   TERMINAL_QUICK_COMMAND_LONG_PROMPTS_RUNTIME_CAPABILITY
 } from '../../../../shared/terminal-quick-command-capabilities'
 import type { OrcaRuntimeService } from '../../orca-runtime'
+import { DESKTOP_RENDERER_RUNTIME_CLIENT_CAPABILITIES } from '../../../ipc/desktop-renderer-runtime-capabilities'
 import { RuntimeClientSettingsController } from '../../runtime-client-settings'
 import {
   updateSettings,
@@ -15,6 +19,7 @@ import {
 } from '../../../persistence/applying-settings/settings-update'
 import type { RpcRequest } from '../core'
 import { RpcDispatcher } from '../dispatcher'
+import { parseRuntimeClientCapabilities } from '../runtime-client-capabilities'
 import { CLIENT_UI_METHODS } from './client-ui'
 
 function makeRequest(method: string, params?: unknown): RpcRequest {
@@ -95,14 +100,37 @@ describe('quick-command client compatibility', () => {
 
   it.each([
     {
-      clientKind: 'runtime' as const,
-      clientCapabilities: [
-        TERMINAL_QUICK_COMMAND_LARGE_LISTS_RUNTIME_CAPABILITY,
-        TERMINAL_QUICK_COMMAND_LONG_PROMPTS_RUNTIME_CAPABILITY
-      ]
+      name: 'local desktop',
+      caller: {
+        clientKind: 'runtime' as const,
+        clientCapabilities: DESKTOP_RENDERER_RUNTIME_CLIENT_CAPABILITIES
+      }
     },
-    undefined
-  ])('saves and acknowledges command forty-one for a current caller (%j)', async (caller) => {
+    {
+      name: 'paired desktop',
+      caller: {
+        clientKind: 'runtime' as const,
+        clientCapabilities: parseRuntimeClientCapabilities(
+          remoteRuntimeClientCapabilities(ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES)
+        )
+      }
+    },
+    {
+      name: 'web',
+      caller: {
+        clientKind: 'runtime' as const,
+        clientCapabilities: parseRuntimeClientCapabilities(WEB_RUNTIME_CLIENT_CAPABILITIES)
+      }
+    },
+    {
+      name: 'CLI',
+      caller: {
+        clientKind: 'runtime' as const,
+        clientCapabilities: parseRuntimeClientCapabilities(remoteRuntimeClientCapabilities())
+      }
+    },
+    { name: 'in-process', caller: undefined }
+  ])('saves and acknowledges command forty-one using $name capabilities', async ({ caller }) => {
     const commands = Array.from({ length: 40 }, (_, index) => ({
       ...shortCommand,
       id: `command-${index}`
@@ -111,16 +139,16 @@ describe('quick-command client compatibility', () => {
 
     const response = await dispatcher.dispatch(
       makeRequest('settings.updateTerminalQuickCommands', {
-        mutation: { type: 'upsert', command: shortCommand }
+        mutation: { type: 'upsert', command: longCommand }
       }),
       caller
     )
 
     expect(response).toMatchObject({
       ok: true,
-      result: { terminalQuickCommands: [...commands, shortCommand] }
+      result: { terminalQuickCommands: [...commands, longCommand] }
     })
-    expect(state.settings.terminalQuickCommands).toEqual([...commands, shortCommand])
+    expect(state.settings.terminalQuickCommands).toEqual([...commands, longCommand])
     expect(scheduleSave).toHaveBeenCalledOnce()
   })
 
