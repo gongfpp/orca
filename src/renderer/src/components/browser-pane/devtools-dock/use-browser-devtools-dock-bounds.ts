@@ -25,7 +25,8 @@ export function useBrowserDevToolsDockBounds(
         rect.width > 0 &&
         rect.height > 0 &&
         placeholder.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
-      const covered = visible && (isWebviewDragPassthroughActive() || hasVisibleOverlayOver(rect))
+      const covered =
+        visible && (isWebviewDragPassthroughActive() || hasVisibleOverlayOver(rect, placeholder))
       const next = !visible
         ? 'hidden'
         : covered

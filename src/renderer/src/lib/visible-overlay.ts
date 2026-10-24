@@ -52,13 +52,15 @@ export function hasVisibleOverlay(options?: VisibleOverlayOptions): boolean {
   })
 }
 
-// Popper surfaces (tooltips, hover cards) and toasts don't own Escape, but they still paint above pages.
-const OVERLAY_LAYER_SELECTOR = `${OVERLAY_SELECTOR}, [data-radix-popper-content-wrapper], [data-sonner-toast]`
+// These don't own Escape, but still paint above pages: popper surfaces (tooltips, hover cards),
+// toasts, modal backdrops and the floating workspace.
+const OVERLAY_LAYER_SELECTOR = `${OVERLAY_SELECTOR}, [data-radix-popper-content-wrapper], [data-sonner-toast], [data-slot$="-overlay"], [data-floating-terminal-panel]`
 
-/** Whether any overlay paints over `rect`; a native view there would hide it. */
-export function hasVisibleOverlayOver(rect: DOMRectReadOnly): boolean {
+/** Whether any overlay paints over `owner`'s `rect`; a native view there would hide it. Layers
+ *  holding `owner`, like a floating workspace showing the page, are under it, not over it. */
+export function hasVisibleOverlayOver(rect: DOMRectReadOnly, owner: Element): boolean {
   return Array.from(document.querySelectorAll(OVERLAY_LAYER_SELECTOR)).some((element) => {
-    if (element.closest('[aria-hidden="true"]')) {
+    if (element.contains(owner) || element.closest('[aria-hidden="true"]')) {
       return false
     }
     const box = element.getBoundingClientRect()
