@@ -51,3 +51,24 @@ export function hasVisibleOverlay(options?: VisibleOverlayOptions): boolean {
     )
   })
 }
+
+// Popper surfaces (tooltips, hover cards) and toasts don't own Escape, but they still paint above pages.
+const OVERLAY_LAYER_SELECTOR = `${OVERLAY_SELECTOR}, [data-radix-popper-content-wrapper], [data-sonner-toast]`
+
+/** Whether any overlay paints over `rect`; a native view there would hide it. */
+export function hasVisibleOverlayOver(rect: DOMRectReadOnly): boolean {
+  return Array.from(document.querySelectorAll(OVERLAY_LAYER_SELECTOR)).some((element) => {
+    if (element.closest('[aria-hidden="true"]')) {
+      return false
+    }
+    const box = element.getBoundingClientRect()
+    return (
+      box.width > 0 &&
+      box.height > 0 &&
+      box.left < rect.right &&
+      box.right > rect.left &&
+      box.top < rect.bottom &&
+      box.bottom > rect.top
+    )
+  })
+}

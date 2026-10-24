@@ -15,15 +15,18 @@ export function installGuestDevToolsWindowBehavior(args: {
   getKeybindings: () => KeybindingOverrides | undefined
   // Emulated viewports scale the guest, so host geometry no longer maps to page coordinates.
   isViewportEmulated: () => boolean
+  isDocked: () => boolean
+  closeDevTools: () => void
 }): () => void {
-  const { guest, getKeybindings, isViewportEmulated } = args
+  const { guest, getKeybindings, isViewportEmulated, isDocked, closeDevTools } = args
   const handleOpened = (): void => {
     const devTools = guest.devToolsWebContents
     if (!devTools || devTools.isDestroyed()) {
       return
     }
-    installCloseShortcut(guest, devTools, getKeybindings)
-    if (process.platform === 'darwin') {
+    installCloseShortcut(guest, devTools, getKeybindings, closeDevTools)
+    // Docked DevTools share the page's window, which already receives mouse moves.
+    if (process.platform === 'darwin' && !isDocked()) {
       installMacHoverRelay(guest, devTools, isViewportEmulated)
     }
   }
@@ -59,7 +62,8 @@ function readKeyDown(input: Electron.InputEvent): KeybindingInput | null {
 function installCloseShortcut(
   guest: Electron.WebContents,
   devTools: Electron.WebContents,
-  getKeybindings: () => KeybindingOverrides | undefined
+  getKeybindings: () => KeybindingOverrides | undefined,
+  closeDevTools: () => void
 ): void {
   // DevTools emits input-event, not before-input-event; closing it also destroys this listener.
   devTools.on('input-event', (_event, inputEvent) => {
@@ -73,7 +77,7 @@ function installCloseShortcut(
     // Defer closing until AppKit finishes routing the key to avoid a performKeyEquivalent crash.
     setImmediate(() => {
       if (!guest.isDestroyed()) {
-        guest.closeDevTools()
+        closeDevTools()
       }
     })
   })

@@ -9,6 +9,7 @@ import type { UpdateCheckOptions } from '../../shared/update-status-types'
 import { translateMain } from '../i18n/main-i18n'
 import { createAppMenuSelectionItem, resolveNativeEditTarget } from './app-menu-selection-item'
 import { createAppMenuQuitItem } from './app-menu-quit-item'
+import { createAppMenuReloadAndDevToolsItems } from './app-menu-reload-devtools-items'
 import { createAppWindowMenu } from './app-menu-window'
 
 export type AppearanceMenuState = {
@@ -40,6 +41,7 @@ type RegisterAppMenuOptions = {
   onToggleAppearance: (key: AppearanceMenuKey) => void
   getAppearanceState: () => AppearanceMenuState
   getKeybindings?: () => KeybindingOverrides | undefined
+  toggleFocusedPageDevTools?: (focused: Electron.WebContents) => boolean
   // Why: the macOS app-menu title. Passed the per-branch dev label since
   // app.name is now pinned to a stable value for Keychain-key stability.
   appMenuLabel?: string
@@ -73,22 +75,6 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
       getKeybindings?.()
     )
     return formatKeybindingList(bindings, process.platform)
-  }
-
-  const reloadFocusedWindow = (ignoreCache: boolean): void => {
-    const webContents = BrowserWindow.getFocusedWindow()?.webContents
-    if (!webContents) {
-      return
-    }
-
-    onBeforeReload?.({ ignoreCache, webContentsId: webContents.id })
-
-    if (ignoreCache) {
-      webContents.reloadIgnoringCache()
-      return
-    }
-
-    webContents.reload()
   }
 
   // Why: modifier-click update checks are hidden power-user affordances.
@@ -284,15 +270,11 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
   const viewMenu: Electron.MenuItemConstructorOptions = {
     label: translateMain('menu.view', 'View'),
     submenu: [
-      {
-        label: translateMain('menu.reload', 'Reload'),
-        click: () => reloadFocusedWindow(false)
-      },
-      {
-        label: `${translateMain('menu.forceReload', 'Force Reload')}\t${shortcutLabel('app.forceReload')}`,
-        click: () => reloadFocusedWindow(true)
-      },
-      { role: 'toggleDevTools' },
+      ...createAppMenuReloadAndDevToolsItems({
+        forceReloadShortcutLabel: shortcutLabel('app.forceReload'),
+        onBeforeReload,
+        toggleFocusedPageDevTools: options.toggleFocusedPageDevTools
+      }),
       { type: 'separator' },
       {
         label: `${translateMain('menu.resetSize', 'Reset Size')}\t${shortcutLabel('zoom.reset')}`,
