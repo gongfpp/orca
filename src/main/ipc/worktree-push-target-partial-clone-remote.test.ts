@@ -17,6 +17,12 @@ import type { GitRemoteExec } from './worktree-push-target-cleanup'
 import { prepareWorktreePushTargetWithExec } from './worktree-push-target-setup'
 
 const execFileAsync = promisify(execFile)
+const isolatedGitEnv = {
+  ...process.env,
+  GIT_DIR: undefined,
+  GIT_WORK_TREE: undefined,
+  GIT_COMMON_DIR: undefined
+}
 
 const FORK_REMOTE = 'pr-contributor'
 const TRACKED_BRANCH = 'contributor/fix'
@@ -26,11 +32,12 @@ let repoPath = ''
 let forkPath = ''
 
 async function git(args: string[], cwd: string): Promise<string> {
-  const { stdout } = await execFileAsync('git', args, { cwd })
+  const { stdout } = await execFileAsync('git', args, { cwd, env: isolatedGitEnv })
   return stdout
 }
 
-const execGit: GitRemoteExec = (args, cwd) => execFileAsync('git', args, { cwd })
+const execGit: GitRemoteExec = (args, cwd) =>
+  execFileAsync('git', args, { cwd, env: isolatedGitEnv })
 
 async function setIdentity(cwd: string): Promise<void> {
   await git(['config', 'user.name', 'Orca Test'], cwd)
